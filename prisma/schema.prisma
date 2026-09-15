@@ -1,0 +1,128 @@
+// ============================================================================
+// MedStudy Hub — schema de banco de dados (PostgreSQL)
+//
+// Separação deliberada (spec seção 16):
+//  - DriveFile: espelho do que vem do Google Drive. Atualizado somente por
+//    uma sincronização (DriveSyncButton -> POST /api/drive/sync).
+//  - UserFileState: estado do usuário sobre um arquivo. NUNCA é apagado por
+//    uma nova sincronização — só é criado/atualizado por ações do usuário
+//    (assistir, marcar como estudado, favoritar).
+//
+// O identificador que liga as duas tabelas é sempre `fileId` (o Drive file
+// ID), nunca o nome do arquivo — nomes podem mudar no Drive sem quebrar o
+// progresso do usuário.
+//
+// Para usar: defina DATABASE_URL em .env.local e rode `npx prisma migrate dev`.
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ContentKind {
+  VIDEOAULA
+  APOSTILA
+  OUTRO
+}
+
+enum WatchStatus {
+  NAO_INICIADA
+  EM_ANDAMENTO
+  ASSISTIDA
+}
+
+enum ReadStatus {
+  NAO_ACESSADO
+  ACESSADO
+  ESTUDADO
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  image         String?
+  createdAt     DateTime  @default(now())
+
+  driveConnections DriveConnection[]
+  fileStates       UserFileState[]
+}
+
+/// Uma pasta raiz do Google Drive conectada por um usuário (seção 5).
+model DriveConnection {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rootFolderId   String
+  rootFolderName String
+  connectedAt    DateTime @default(now())
+  lastSyncedAt   DateTime?
+
+  files DriveFile[]
+
+  @@unique([userId, rootFolderId])
+}
+
+/// Metadados de um arquivo do Drive — espelha o Drive, não o usuário.
+model DriveFile {
+  id           String       @id @default(cuid())
+  /// Google Drive file ID — identificador primário real (nunca o nome).
+  fileId       String       @unique
+  connectionId String
+  connection   DriveConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  folderId     String
+  folderPath   String[]
+  name         String
+  mimeType     String
+  extension    String
+  sizeBytes    BigInt
+  modifiedAt   DateTime
+  webViewUrl   String
+  embedUrl     String?
+  thumbnailUrl String?
+  durationSeconds Int?
+
+  kind         ContentKind
+  subjectSlug  String
+  lessonNumber Int?
+  topic        String
+  displayTitle String
+  description  String?
+  needsReview  Boolean      @default(false)
+
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  userStates   UserFileState[]
+
+  @@index([subjectSlug])
+  @@index([kind])
+}
+
+/// Estado do usuário para um arquivo — sobrevive a novas sincronizações.
+model UserFileState {
+  id                     String       @id @default(cuid())
+  userId                 String
+  user                   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fileId                 String
+  file                   DriveFile    @relation(fields: [fileId], references: [fileId], onDelete: Cascade)
+
+  watchStatus            WatchStatus?
+  readStatus             ReadStatus?
+  progressPercent        Int          @default(0)
+  playbackPositionSeconds Int?
+  favorite               Boolean      @default(false)
+  lastViewedAt           DateTime?
+  completedAt            DateTime?
+
+  updatedAt              DateTime     @updatedAt
+
+  @@unique([userId, fileId])
+  @@index([userId])
+}

@@ -1,0 +1,38 @@
+{
+  "name": "medstudy-hub",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MedStudy Hub — biblioteca de estudos organizada a partir do Google Drive, para estudantes de Medicina.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "14.2.35",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "next-auth": "^4.24.8",
+    "googleapis": "^144.0.0",
+    "@prisma/client": "^5.20.0",
+    "zustand": "^4.5.5",
+    "next-themes": "^0.3.0",
+    "lucide-react": "^0.451.0",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^2.5.3"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "@types/node": "^20.16.10",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.0",
+    "tailwindcss": "^3.4.13",
+    "postcss": "^8.4.47",
+    "autoprefixer": "^10.4.20",
+    "prisma": "^5.20.0",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "14.2.16"
+  }
+}

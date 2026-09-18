@@ -1,13 +1,14 @@
 // ============================================================================
 // Funções puras de agregação de progresso — combinam o catálogo de conteúdo
-// (DriveFile + classificação) com o estado do usuário (UserFileState) para
-// produzir os números mostrados no Dashboard, em Disciplinas e em Progresso.
+// (StudyContent, vindo da planilha importada) com o estado do usuário
+// (ContentProgress) para produzir os números mostrados no Dashboard, em
+// Disciplinas e em Progresso.
 // ============================================================================
 
-import { KNOWN_SUBJECTS } from "./classify";
-import type { StudyContent, UserFileState } from "./types";
+import { resolveSubject } from "./subjects";
+import type { StudyContent, ContentProgress } from "./types";
 
-export type UserStateMap = Record<string, UserFileState>;
+export type UserStateMap = Record<string, ContentProgress>;
 
 export interface SubjectProgress {
   slug: string;
@@ -23,13 +24,13 @@ export interface SubjectProgress {
   percent: number;
 }
 
-function isComplete(item: StudyContent, state?: UserFileState): boolean {
+function isComplete(item: StudyContent, state?: ContentProgress): boolean {
   if (!state) return false;
   if (item.kind === "videoaula") return state.watchStatus === "assistida";
   return state.readStatus === "estudado";
 }
 
-function isInProgress(item: StudyContent, state?: UserFileState): boolean {
+function isInProgress(item: StudyContent, state?: ContentProgress): boolean {
   if (!state) return false;
   if (item.kind === "videoaula") return state.watchStatus === "em_andamento";
   return state.readStatus === "acessado";
@@ -45,7 +46,7 @@ export function computeSubjectProgress(content: StudyContent[], userStates: User
 
   const result: SubjectProgress[] = [];
   for (const [slug, items] of bySubject.entries()) {
-    const meta = KNOWN_SUBJECTS.find((s) => s.slug === slug);
+    const meta = resolveSubject(items[0].subjectName);
     const lessons = items.filter((i) => i.kind === "videoaula");
     const materials = items.filter((i) => i.kind !== "videoaula");
     const watchedLessons = lessons.filter((i) => isComplete(i, userStates[i.fileId])).length;
@@ -54,9 +55,9 @@ export function computeSubjectProgress(content: StudyContent[], userStates: User
     const completedItems = watchedLessons + studiedMaterials;
     result.push({
       slug,
-      name: meta?.name ?? slug,
-      colorToken: meta?.colorToken ?? "215 16% 47%",
-      icon: meta?.icon ?? "BookOpen",
+      name: meta.name,
+      colorToken: meta.colorToken,
+      icon: meta.icon,
       totalLessons: lessons.length,
       watchedLessons,
       totalMaterials: materials.length,

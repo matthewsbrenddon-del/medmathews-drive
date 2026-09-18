@@ -8,7 +8,7 @@ import { MaterialCard } from "@/components/MaterialCard";
 import { ProgressCircle } from "@/components/ProgressCircle";
 import { SubjectIcon } from "@/components/SubjectIcon";
 import { VideoCard } from "@/components/VideoCard";
-import { KNOWN_SUBJECTS } from "@/lib/classify";
+import { resolveSubject } from "@/lib/subjects";
 import { useContent } from "@/lib/content";
 import { computeSubjectProgress } from "@/lib/progress";
 import { useStudyStore } from "@/lib/store";
@@ -24,14 +24,13 @@ const TABS = [
 type TabId = (typeof TABS)[number]["id"];
 
 export default function DisciplinaPage({ params }: { params: { slug: string } }) {
-  const subjectMeta = KNOWN_SUBJECTS.find((s) => s.slug === params.slug);
-  if (!subjectMeta) notFound();
-
   const content = useContent();
   const userStates = useStudyStore((s) => s.userStates);
   const [tab, setTab] = useState<TabId>("geral");
 
   const items = content.filter((c) => c.subjectSlug === params.slug);
+  if (items.length === 0) notFound();
+  const subjectMeta = resolveSubject(items[0].subjectName);
   const lessons = items.filter((c) => c.kind === "videoaula");
   const materials = items.filter((c) => c.kind === "apostila");
   const others = items.filter((c) => c.kind === "outro");

@@ -1,14 +1,15 @@
 import Link from "next/link";
 import { Play, Video as VideoIcon } from "lucide-react";
-import { KNOWN_SUBJECTS } from "@/lib/classify";
-import type { StudyContent, UserFileState } from "@/lib/types";
+import { resolveSubject } from "@/lib/subjects";
+import type { StudyContent, ContentProgress } from "@/lib/types";
 import { formatDuration } from "@/lib/utils";
 import { FavoriteButton } from "./FavoriteButton";
+import { PriorityBadge } from "./PriorityBadge";
 import { ProgressBar } from "./ProgressBar";
 import { StatusBadge } from "./StatusBadge";
 
-export function VideoCard({ content, state }: { content: StudyContent; state?: UserFileState }) {
-  const subject = KNOWN_SUBJECTS.find((s) => s.slug === content.subjectSlug);
+export function VideoCard({ content, state }: { content: StudyContent; state?: ContentProgress }) {
+  const subject = resolveSubject(content.subjectName);
   const status = state?.watchStatus ?? "nao_iniciada";
 
   return (
@@ -43,9 +44,12 @@ export function VideoCard({ content, state }: { content: StudyContent; state?: U
       </div>
 
       <div className="p-4 flex flex-col gap-2 flex-1">
-        <p className="text-xs font-medium" style={{ color: subject ? `hsl(${subject.colorToken})` : undefined }}>
-          {subject?.name ?? "Disciplina"}
-        </p>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs font-medium" style={{ color: `hsl(${subject.colorToken})` }}>
+            {subject.name}
+          </p>
+          <PriorityBadge priority={content.priority} />
+        </div>
         <h3 className="font-medium text-sm text-foreground leading-snug line-clamp-2">{content.displayTitle}</h3>
         <div className="mt-auto pt-1 flex flex-col gap-2">
           {state && state.progressPercent > 0 && status !== "nao_iniciada" && (

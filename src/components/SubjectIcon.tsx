@@ -15,6 +15,13 @@ import {
   ShieldCheck,
   Stethoscope,
   BookOpen,
+  Leaf,
+  Brain,
+  Flame,
+  Droplet,
+  Sprout,
+  Syringe,
+  Sun,
   type LucideIcon,
 } from "lucide-react";
 
@@ -35,6 +42,13 @@ const ICONS: Record<string, LucideIcon> = {
   ShieldCheck,
   Stethoscope,
   BookOpen,
+  Leaf,
+  Brain,
+  Flame,
+  Droplet,
+  Sprout,
+  Syringe,
+  Sun,
 };
 
 export function SubjectIcon({ name, size = 18, className }: { name: string; size?: number; className?: string }) {

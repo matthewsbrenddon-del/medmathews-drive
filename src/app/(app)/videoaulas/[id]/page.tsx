@@ -8,10 +8,11 @@ import { ProgressBar } from "@/components/ProgressBar";
 import { StatusBadge } from "@/components/StatusBadge";
 import { VideoPlayer } from "@/components/VideoPlayer";
 import { VideoCard } from "@/components/VideoCard";
-import { KNOWN_SUBJECTS } from "@/lib/classify";
+import { PriorityBadge } from "@/components/PriorityBadge";
+import { resolveSubject } from "@/lib/subjects";
 import { useContent } from "@/lib/content";
 import { useStudyStore } from "@/lib/store";
-import { formatBytes, formatDuration, formatRelativeDate } from "@/lib/utils";
+import { formatDuration } from "@/lib/utils";
 
 export default function VideoDetailPage({ params }: { params: { id: string } }) {
   const content = useContent();
@@ -23,7 +24,7 @@ export default function VideoDetailPage({ params }: { params: { id: string } }) 
   const setPlaybackProgress = useStudyStore((s) => s.setPlaybackProgress);
   const recordStudyToday = useStudyStore((s) => s.recordStudyToday);
 
-  const subject = KNOWN_SUBJECTS.find((s) => s.slug === item.subjectSlug);
+  const subject = resolveSubject(item.subjectName);
   const state = userStates[item.fileId];
   const status = state?.watchStatus ?? "nao_iniciada";
   const duration = item.durationSeconds ?? 0;
@@ -54,18 +55,25 @@ export default function VideoDetailPage({ params }: { params: { id: string } }) 
 
       <div className="flex flex-col lg:flex-row lg:items-start gap-6">
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium" style={{ color: subject ? `hsl(${subject.colorToken})` : undefined }}>
-            {subject?.name ?? "Disciplina"}
-          </p>
+          <div className="flex items-center gap-3">
+            <p className="text-sm font-medium" style={{ color: `hsl(${subject.colorToken})` }}>
+              {subject.name}
+            </p>
+            {item.modulo && <span className="text-xs text-muted-foreground">· {item.modulo}</span>}
+          </div>
           <h1 className="text-xl sm:text-2xl font-semibold text-foreground mt-1">{item.displayTitle}</h1>
-          {item.description && <p className="text-sm text-muted-foreground mt-2">{item.description}</p>}
+          {item.topic && <p className="text-sm text-muted-foreground mt-2">{item.topic}</p>}
 
           <div className="flex flex-wrap items-center gap-3 mt-4 text-xs text-muted-foreground">
             <span>{formatDuration(item.durationSeconds)}</span>
             <span aria-hidden>•</span>
-            <span>{formatBytes(item.sizeBytes)}</span>
-            <span aria-hidden>•</span>
-            <span>Modificado {formatRelativeDate(item.modifiedAt)}</span>
+            <PriorityBadge priority={item.priority} />
+            {item.observacoes && (
+              <>
+                <span aria-hidden>•</span>
+                <span>{item.observacoes}</span>
+              </>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-3 mt-6">
@@ -114,7 +122,7 @@ export default function VideoDetailPage({ params }: { params: { id: string } }) 
 
       {related.length > 0 && (
         <section>
-          <h2 className="text-lg font-semibold text-foreground mb-4">Outras aulas de {subject?.name}</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-4">Outras aulas de {subject.name}</h2>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {related.map((r) => (
               <VideoCard key={r.fileId} content={r} state={userStates[r.fileId]} />
@@ -124,7 +132,7 @@ export default function VideoDetailPage({ params }: { params: { id: string } }) 
       )}
 
       <Link href={`/disciplinas/${item.subjectSlug}`} className="text-sm font-medium text-primary self-start">
-        ← Voltar para {subject?.name ?? "a disciplina"}
+        ← Voltar para {subject.name}
       </Link>
     </div>
   );

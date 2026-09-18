@@ -9,7 +9,7 @@ import { SubjectCard } from "@/components/SubjectCard";
 import { useContent } from "@/lib/content";
 import { computeOverallProgress, computeSubjectProgress, getContinueStudying } from "@/lib/progress";
 import { useStudyStore } from "@/lib/store";
-import { KNOWN_SUBJECTS } from "@/lib/classify";
+import { resolveSubject } from "@/lib/subjects";
 import { formatDuration } from "@/lib/utils";
 
 export default function DashboardPage() {
@@ -74,17 +74,14 @@ export default function DashboardPage() {
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {continuing.map((item) => {
-              const subject = KNOWN_SUBJECTS.find((s) => s.slug === item.subjectSlug);
+              const subject = resolveSubject(item.subjectName);
               const state = userStates[item.fileId];
               const href = item.kind === "videoaula" ? `/videoaulas/${item.fileId}` : `/materiais/${item.fileId}`;
               return (
                 <Link key={item.fileId} href={href} className="card p-4 flex flex-col gap-3 hover:shadow-lift hover:-translate-y-0.5 transition-all">
                   <div className="flex items-center gap-2">
-                    <span
-                      className="h-2 w-2 rounded-full"
-                      style={{ backgroundColor: `hsl(${subject?.colorToken ?? "217 65% 30%"})` }}
-                    />
-                    <p className="text-xs font-medium text-muted-foreground">{subject?.name ?? "Disciplina"}</p>
+                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: `hsl(${subject.colorToken})` }} />
+                    <p className="text-xs font-medium text-muted-foreground">{subject.name}</p>
                   </div>
                   <h3 className="font-medium text-sm text-foreground line-clamp-2">{item.displayTitle}</h3>
                   <div className="mt-auto flex flex-col gap-2">

@@ -1,17 +1,18 @@
 "use client";
 
 // ============================================================================
-// Estado do usuário (client-side), persistido em localStorage.
+// Estado do usuário sobre o conteúdo (aulas/materiais), client-side,
+// persistido em localStorage.
 //
 // Em produção, este é o ponto que passaria a escrever na tabela
-// "UserFileState" via API/Prisma (ver prisma/schema.prisma e
-// src/app/api/progress/route.ts) em vez de localStorage — a MESMA forma de
-// dado é usada nos dois casos, então a troca é apenas de "onde persistir".
+// "UserProgress" via API/Prisma (ver prisma/schema.prisma) em vez de
+// localStorage — a MESMA forma de dado é usada nos dois casos, então a
+// troca é apenas de "onde persistir".
 // ============================================================================
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { ReadStatus, UserFileState, WatchStatus } from "./types";
+import type { ContentProgress, ReadStatus, WatchStatus } from "./types";
 
 function todayKey(): string {
   return new Date().toISOString().slice(0, 10);
@@ -19,15 +20,12 @@ function todayKey(): string {
 
 interface StudyStoreState {
   onboarded: boolean;
-  connectedFolderName: string | null;
-  demoMode: boolean;
-  userStates: Record<string, UserFileState>;
+  userStates: Record<string, ContentProgress>;
   studyDates: string[];
 
-  completeOnboarding: (folderName: string, demoMode: boolean) => void;
-  resetConnection: () => void;
+  completeOnboarding: () => void;
 
-  getFileState: (fileId: string) => UserFileState;
+  getFileState: (fileId: string) => ContentProgress;
   toggleFavorite: (fileId: string) => void;
   setWatchStatus: (fileId: string, status: WatchStatus) => void;
   setPlaybackProgress: (fileId: string, positionSeconds: number, durationSeconds: number) => void;
@@ -36,7 +34,7 @@ interface StudyStoreState {
   currentStreak: () => number;
 }
 
-function emptyState(fileId: string): UserFileState {
+function emptyState(fileId: string): ContentProgress {
   return { fileId, progressPercent: 0, favorite: false };
 }
 
@@ -44,16 +42,10 @@ export const useStudyStore = create<StudyStoreState>()(
   persist(
     (set, get) => ({
       onboarded: false,
-      connectedFolderName: null,
-      demoMode: true,
       userStates: {},
       studyDates: [],
 
-      completeOnboarding: (folderName, demoMode) =>
-        set({ onboarded: true, connectedFolderName: folderName, demoMode }),
-
-      resetConnection: () =>
-        set({ onboarded: false, connectedFolderName: null, userStates: {}, studyDates: [] }),
+      completeOnboarding: () => set({ onboarded: true }),
 
       getFileState: (fileId) => get().userStates[fileId] ?? emptyState(fileId),
 
@@ -72,7 +64,7 @@ export const useStudyStore = create<StudyStoreState>()(
         set((s) => {
           const current = s.userStates[fileId] ?? emptyState(fileId);
           const progressPercent = status === "assistida" ? 100 : status === "nao_iniciada" ? 0 : current.progressPercent || 10;
-          const next: UserFileState = {
+          const next: ContentProgress = {
             ...current,
             watchStatus: status,
             progressPercent,

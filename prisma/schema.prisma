@@ -1,18 +1,30 @@
 // ============================================================================
-// MedStudy Hub — schema de banco de dados (PostgreSQL)
+// MedStudy Hub v2 — schema de banco de dados (PostgreSQL)
 //
-// Separação deliberada (spec seção 16):
-//  - DriveFile: espelho do que vem do Google Drive. Atualizado somente por
-//    uma sincronização (DriveSyncButton -> POST /api/drive/sync).
-//  - UserFileState: estado do usuário sobre um arquivo. NUNCA é apagado por
-//    uma nova sincronização — só é criado/atualizado por ações do usuário
-//    (assistir, marcar como estudado, favoritar).
+// Modelo simplificado (spec v2, seção 5): não há mais integração OAuth com o
+// Google Drive. Todo o conteúdo (aulas/materiais) e o banco de questões são
+// importados por planilha .xlsx (ver src/lib/importCourses.ts e
+// src/lib/importQuestions.ts). O identificador estável de um item de
+// conteúdo é o `driveFileId` (nunca o título) — reimportar a planilha faz
+// upsert por esse ID e nunca duplica registros.
 //
-// O identificador que liga as duas tabelas é sempre `fileId` (o Drive file
-// ID), nunca o nome do arquivo — nomes podem mudar no Drive sem quebrar o
-// progresso do usuário.
+// Nesta versão de demonstração a aplicação roda inteiramente client-side
+// (localStorage via Zustand, ver src/lib/contentStore.ts e
+// src/lib/questionStore.ts), sem exigir DATABASE_URL. Este schema documenta
+// como a mesma forma de dado seria persistida em produção: defina
+// DATABASE_URL e rode `npx prisma migrate dev`, e troque os stores client-side
+// por chamadas às rotas de importação persistindo aqui (há um TODO em cada
+// rota de import apontando onde plugar o Prisma).
 //
-// Para usar: defina DATABASE_URL em .env.local e rode `npx prisma migrate dev`.
+// >>> PONTO DE EXTENSÃO FUTURO (não implementado agora) <<<
+// Se um dia for necessário automatizar a leitura de pastas do Drive (em vez
+// de depender da planilha), a integração OAuth completa da v1 pode ser
+// restaurada: NextAuth + googleapis, varredura recursiva por pasta, e um
+// job de sincronização que faz upsert em Content por driveFileId — o
+// restante do schema (Question, UserProgress) não muda nada, e o app já
+// resolve tudo por driveFileId/questionId, então plugar essa fonte alternativa
+// de importação não exige tocar nas telas de estudo, apenas na tela de
+// importação.
 // ============================================================================
 
 generator client {
@@ -30,6 +42,11 @@ enum ContentKind {
   OUTRO
 }
 
+enum ItemType {
+  CONTEUDO
+  QUESTAO
+}
+
 enum WatchStatus {
   NAO_INICIADA
   EM_ANDAMENTO
@@ -42,87 +59,112 @@ enum ReadStatus {
   ESTUDADO
 }
 
+enum QuestionStatus {
+  NAO_RESPONDIDA
+  ACERTADA
+  ERRADA
+}
+
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  name          String?
-  image         String?
-  createdAt     DateTime  @default(now())
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
 
-  driveConnections DriveConnection[]
-  fileStates       UserFileState[]
+  progress UserProgress[]
 }
 
-/// Uma pasta raiz do Google Drive conectada por um usuário (seção 5).
-model DriveConnection {
-  id             String   @id @default(cuid())
-  userId         String
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  rootFolderId   String
-  rootFolderName String
-  connectedAt    DateTime @default(now())
-  lastSyncedAt   DateTime?
-
-  files DriveFile[]
-
-  @@unique([userId, rootFolderId])
-}
-
-/// Metadados de um arquivo do Drive — espelha o Drive, não o usuário.
-model DriveFile {
-  id           String       @id @default(cuid())
-  /// Google Drive file ID — identificador primário real (nunca o nome).
-  fileId       String       @unique
-  connectionId String
-  connection   DriveConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
-
-  folderId     String
-  folderPath   String[]
-  name         String
-  mimeType     String
-  extension    String
-  sizeBytes    BigInt
-  modifiedAt   DateTime
-  webViewUrl   String
-  embedUrl     String?
-  thumbnailUrl String?
-  durationSeconds Int?
-
-  kind         ContentKind
+/// Um item de conteúdo (aula ou material) importado da planilha de cursos.
+/// `driveFileId` é a chave estável — nunca o título, nunca o nome do arquivo.
+model Content {
+  id           String      @id @default(cuid())
+  /// ID do arquivo no Google Drive, extraído do link de compartilhamento.
+  driveFileId  String      @unique
+  driveLink    String
+  disciplina   String
   subjectSlug  String
+  modulo       String?
   lessonNumber Int?
-  topic        String
-  displayTitle String
-  description  String?
-  needsReview  Boolean      @default(false)
+  titulo       String
+  tema         String?
+  kind         ContentKind
+  durationMin  Int?
+  ordem        Int?
+  prioridade   Int         @default(3)
+  observacoes  String?
 
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  userStates   UserFileState[]
+  progress UserProgress[]
 
   @@index([subjectSlug])
   @@index([kind])
 }
 
-/// Estado do usuário para um arquivo — sobrevive a novas sincronizações.
-model UserFileState {
-  id                     String       @id @default(cuid())
-  userId                 String
-  user                   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  fileId                 String
-  file                   DriveFile    @relation(fields: [fileId], references: [fileId], onDelete: Cascade)
+/// Uma questão do banco de residência médica, importada por planilha.
+model Question {
+  id           String   @id @default(cuid())
+  disciplina   String
+  subjectSlug  String
+  tema         String?
+  banca        String?
+  ano          Int?
+  enunciado    String
+  alternativaA String
+  alternativaB String
+  alternativaC String
+  alternativaD String
+  alternativaE String?
+  gabarito     String
+  comentario   String?
+  dificuldade  Int      @default(3)
+  tags         String[]
+  observacoes  String?
+  hasImage     Boolean  @default(false)
 
-  watchStatus            WatchStatus?
-  readStatus             ReadStatus?
-  progressPercent        Int          @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  progress UserProgress[]
+
+  @@index([subjectSlug])
+  @@index([banca])
+  @@index([ano])
+}
+
+/// Progresso do usuário — nunca perdido em uma reimportação, sempre
+/// referenciado por ID (driveFileId do Content ou id da Question), nunca
+/// por título/nome.
+model UserProgress {
+  id       String   @id @default(cuid())
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  itemType ItemType
+
+  contentId String?
+  content   Content? @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  questionId String?
+  question   Question? @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  watchStatus             WatchStatus?
+  readStatus              ReadStatus?
+  questionStatus          QuestionStatus?
+  progressPercent         Int             @default(0)
   playbackPositionSeconds Int?
-  favorite               Boolean      @default(false)
-  lastViewedAt           DateTime?
-  completedAt            DateTime?
+  favorite                Boolean         @default(false)
+  lastViewedAt            DateTime?
+  completedAt             DateTime?
 
-  updatedAt              DateTime     @updatedAt
+  /// Histórico de respostas (para questões) — usado pela revisão espaçada
+  /// simples (spec v2 seção 3): sai da fila de revisão após 2 acertos
+  /// seguidos.
+  correctStreak Int      @default(0)
+  answerHistory Json?
 
-  @@unique([userId, fileId])
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, contentId])
+  @@unique([userId, questionId])
   @@index([userId])
 }

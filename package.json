@@ -2,7 +2,7 @@
   "name": "medstudy-hub",
   "version": "1.0.0",
   "private": true,
-  "description": "MedStudy Hub — biblioteca de estudos organizada a partir do Google Drive, para estudantes de Medicina.",
+  "description": "MedStudy Hub — biblioteca de estudos, banco de questões e cronograma adaptativo para estudantes de Medicina.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -14,14 +14,13 @@
     "next": "14.2.35",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "next-auth": "^4.24.8",
-    "googleapis": "^144.0.0",
     "@prisma/client": "^5.20.0",
     "zustand": "^4.5.5",
     "next-themes": "^0.3.0",
     "lucide-react": "^0.451.0",
     "clsx": "^2.1.1",
-    "tailwind-merge": "^2.5.3"
+    "tailwind-merge": "^2.5.3",
+    "exceljs": "^4.4.0"
   },
   "devDependencies": {
     "typescript": "^5.6.3",

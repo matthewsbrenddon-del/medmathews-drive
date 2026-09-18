@@ -20,6 +20,31 @@ export function formatDuration(seconds?: number): string {
   return `${m}min`;
 }
 
+/** Hash determinístico simples (mesma entrada -> mesma saída), usado para
+ * gerar IDs/cores estáveis sem depender de um contador ou de Math.random(). */
+export function seededHash(input: string): number {
+  let hash = 0;
+  for (let i = 0; i < input.length; i++) {
+    hash = (hash << 5) - hash + input.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+export function normalizeText(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+export function slugify(text: string): string {
+  return normalizeText(text)
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "geral";
+}
+
 export function formatRelativeDate(iso?: string): string {
   if (!iso) return "—";
   const date = new Date(iso);

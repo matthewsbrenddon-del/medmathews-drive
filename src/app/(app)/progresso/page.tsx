@@ -1,21 +1,28 @@
 "use client";
 
-import { Flame, Layers, Video as VideoIcon, BookOpen as BookOpenIcon } from "lucide-react";
+import { Brain, Flame, Layers, Target, Video as VideoIcon, BookOpen as BookOpenIcon } from "lucide-react";
 import { ProgressBar } from "@/components/ProgressBar";
 import { ProgressCircle } from "@/components/ProgressCircle";
 import { SubjectIcon } from "@/components/SubjectIcon";
 import { useContent } from "@/lib/content";
 import { computeOverallProgress, computeSubjectProgress } from "@/lib/progress";
 import { useStudyStore } from "@/lib/store";
+import { useQuestionStore } from "@/lib/questionStore";
+import { useQuestionProgressStore } from "@/lib/questionProgressStore";
+import { computeQuestionStats } from "@/lib/questionStats";
+import { resolveSubject } from "@/lib/subjects";
 
 export default function ProgressoPage() {
   const content = useContent();
   const userStates = useStudyStore((s) => s.userStates);
   const currentStreak = useStudyStore((s) => s.currentStreak());
+  const questions = useQuestionStore((s) => s.questions);
+  const questionProgress = useQuestionProgressStore((s) => s.progress);
 
   const overall = computeOverallProgress(content, userStates);
   const subjects = computeSubjectProgress(content, userStates);
   const remaining = content.length - overall.watchedLessons - overall.studiedMaterials;
+  const questionStats = computeQuestionStats(questions, questionProgress);
 
   return (
     <div className="flex flex-col gap-9">
@@ -83,6 +90,58 @@ export default function ProgressoPage() {
             </div>
           ))}
         </div>
+      </section>
+
+      <section>
+        <h2 className="text-lg font-semibold text-foreground mb-4">Desempenho em questões</h2>
+        {questionStats.overall.answered === 0 ? (
+          <div className="card p-6 flex items-center gap-4">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-accent/10 text-accent shrink-0">
+              <Brain size={20} />
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Responda questões no Banco de Questões para acompanhar seu percentual de acerto aqui.
+            </p>
+          </div>
+        ) : (
+          <div className="card p-6 flex flex-col gap-5">
+            <div className="flex items-center gap-6">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-accent/10 text-accent">
+                <Target size={26} />
+              </div>
+              <div>
+                <p className="text-2xl font-semibold text-foreground">{questionStats.overall.accuracyPercent}%</p>
+                <p className="text-sm text-muted-foreground">
+                  {questionStats.overall.correct} acertos em {questionStats.overall.answered} questões respondidas
+                </p>
+              </div>
+            </div>
+
+            <div className="divide-y divide-border">
+              {questionStats.bySubject.map((s) => (
+                <div key={s.slug} className="flex items-center gap-4 py-3">
+                  <div
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+                    style={{ backgroundColor: `hsl(${s.colorToken} / 0.12)`, color: `hsl(${s.colorToken})` }}
+                  >
+                    <SubjectIcon name={resolveSubject(s.name).icon} size={14} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-medium text-foreground truncate">{s.name}</p>
+                      <span className="text-xs text-muted-foreground shrink-0">
+                        {s.correct}/{s.answered} · {s.accuracyPercent}%
+                      </span>
+                    </div>
+                    <div className="mt-1.5">
+                      <ProgressBar percent={s.accuracyPercent} colorToken={s.colorToken} size="sm" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
     </div>
   );

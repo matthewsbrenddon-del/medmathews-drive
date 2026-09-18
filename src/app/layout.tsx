@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Source_Serif_4 } from "next/font/google";
 import { ThemeProvider } from "@/components/ThemeProvider";
-import { SessionProviderWrapper } from "@/components/SessionProviderWrapper";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
@@ -10,7 +9,7 @@ const sourceSerif = Source_Serif_4({ subsets: ["latin"], variable: "--font-serif
 export const metadata: Metadata = {
   title: "MedStudy Hub",
   description:
-    "Transforme sua pasta do Google Drive em uma biblioteca de estudos organizada para a graduação em Medicina.",
+    "Biblioteca de estudos, banco de questões e cronograma adaptativo para a graduação em Medicina.",
 };
 
 export const viewport: Viewport = {
@@ -26,9 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <body className={`${inter.variable} ${sourceSerif.variable} font-sans`}>
-        <SessionProviderWrapper>
-          <ThemeProvider>{children}</ThemeProvider>
-        </SessionProviderWrapper>
+        <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>
   );

@@ -1,56 +1,83 @@
 "use client";
 
 import { useState } from "react";
-import { useSession, signOut } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import { Folder, Info, LogOut, Moon, User } from "lucide-react";
+import { RefreshCcw, Info, Moon, Database } from "lucide-react";
 import { ConfirmationModal } from "@/components/ConfirmationModal";
-import { DriveSyncButton } from "@/components/DriveSyncButton";
+import { ImportCoursesPanel } from "@/components/ImportCoursesPanel";
+import { ImportQuestionsPanel } from "@/components/ImportQuestionsPanel";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { useStudyStore } from "@/lib/store";
+import { useContentStore } from "@/lib/contentStore";
+import { useQuestionStore } from "@/lib/questionStore";
+import { formatRelativeDate } from "@/lib/utils";
 
 export default function ConfiguracoesPage() {
-  const router = useRouter();
-  const { data: session } = useSession();
-  const demoMode = useStudyStore((s) => s.demoMode);
-  const connectedFolderName = useStudyStore((s) => s.connectedFolderName);
-  const resetConnection = useStudyStore((s) => s.resetConnection);
+  const hasImported = useContentStore((s) => s.hasImported);
+  const lastImport = useContentStore((s) => s.lastImport);
+  const resetToDemo = useContentStore((s) => s.resetToDemo);
+  const lastQuestionImport = useQuestionStore((s) => s.lastImport);
+  const resetQuestions = useQuestionStore((s) => s.resetToDemo);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  function handleDisconnect() {
-    resetConnection();
-    if (session) signOut({ redirect: false });
+  function handleReset() {
+    resetToDemo();
+    resetQuestions();
     setConfirmOpen(false);
-    router.push("/onboarding");
   }
 
   return (
     <div className="flex flex-col gap-6 max-w-2xl">
       <div>
         <h1 className="text-2xl font-semibold text-foreground">Configurações</h1>
-        <p className="text-muted-foreground mt-1">Gerencie sua conta, conexão com o Drive e preferências.</p>
+        <p className="text-muted-foreground mt-1">Importe sua biblioteca de estudos e ajuste preferências.</p>
       </div>
 
-      <section className="card p-5 flex items-center gap-4">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-light text-primary shrink-0">
-          <User size={20} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="font-medium text-foreground truncate">{session?.user?.name ?? "Estudante (modo demonstração)"}</p>
-          <p className="text-sm text-muted-foreground truncate">{session?.user?.email ?? "Nenhuma conta Google conectada"}</p>
-        </div>
-      </section>
+      {!hasImported && (
+        <section className="rounded-2xl border border-accent/20 bg-accent/5 p-5 flex gap-3">
+          <Info size={18} className="text-accent shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-foreground">Mostrando dados de exemplo</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Você ainda não importou uma planilha própria — a plataforma está usando conteúdo fictício para você
+              conhecer a experiência. Importe sua planilha de cursos abaixo para substituí-lo.
+            </p>
+          </div>
+        </section>
+      )}
 
-      <section className="card p-5 flex items-center gap-4">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent/10 text-accent shrink-0">
-          <Folder size={20} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="font-medium text-foreground">Pasta conectada</p>
-          <p className="text-sm text-muted-foreground truncate">{connectedFolderName ?? "Nenhuma pasta conectada"}</p>
-        </div>
-        <DriveSyncButton />
-      </section>
+      {lastImport && (
+        <section className="card p-5 flex items-center gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent/10 text-accent shrink-0">
+            <RefreshCcw size={19} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-foreground truncate">{lastImport.fileName}</p>
+            <p className="text-sm text-muted-foreground">
+              {lastImport.imported} itens importados{lastImport.skipped > 0 ? `, ${lastImport.skipped} ignorados` : ""} ·{" "}
+              {formatRelativeDate(lastImport.importedAt)}
+            </p>
+          </div>
+        </section>
+      )}
+
+      <ImportCoursesPanel />
+
+      <ImportQuestionsPanel />
+
+      {lastQuestionImport && (
+        <section className="card p-5 flex items-center gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent/10 text-accent shrink-0">
+            <Database size={19} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-foreground truncate">{lastQuestionImport.fileName}</p>
+            <p className="text-sm text-muted-foreground">
+              {lastQuestionImport.imported} questões importadas
+              {lastQuestionImport.skipped > 0 ? `, ${lastQuestionImport.skipped} ignoradas` : ""} ·{" "}
+              {formatRelativeDate(lastQuestionImport.importedAt)}
+            </p>
+          </div>
+        </section>
+      )}
 
       <section className="card p-5 flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
@@ -65,40 +92,29 @@ export default function ConfiguracoesPage() {
         <ThemeToggle />
       </section>
 
-      {demoMode && (
-        <section className="rounded-2xl border border-accent/20 bg-accent/5 p-5 flex gap-3">
-          <Info size={18} className="text-accent shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-medium text-foreground">Modo demonstração ativo</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Este ambiente está usando dados fictícios de exemplo, pois nenhuma credencial real do Google foi
-              configurada. Para conectar um Google Drive real, defina{" "}
-              <code className="font-mono text-xs">GOOGLE_CLIENT_ID</code>,{" "}
-              <code className="font-mono text-xs">GOOGLE_CLIENT_SECRET</code> e{" "}
-              <code className="font-mono text-xs">DATABASE_URL</code> — veja o arquivo{" "}
-              <code className="font-mono text-xs">.env.example</code> na raiz do projeto.
-            </p>
-          </div>
-        </section>
-      )}
-
       <section className="card p-5 flex items-center justify-between gap-4">
         <div>
-          <p className="font-medium text-foreground">Desconectar Google Drive</p>
-          <p className="text-sm text-muted-foreground mt-1">Isso removerá a conexão e todo o seu progresso salvo neste dispositivo.</p>
+          <p className="font-medium text-foreground">Restaurar dados de exemplo</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Remove a biblioteca e o banco de questões importados neste dispositivo e volta aos dados fictícios.
+          </p>
         </div>
-        <button type="button" onClick={() => setConfirmOpen(true)} className="btn-outline text-danger border-danger/30 hover:bg-danger/5">
-          <LogOut size={15} /> Desconectar
+        <button
+          type="button"
+          onClick={() => setConfirmOpen(true)}
+          className="btn-outline text-danger border-danger/30 hover:bg-danger/5 shrink-0"
+        >
+          Restaurar
         </button>
       </section>
 
       <ConfirmationModal
         open={confirmOpen}
-        title="Desconectar Google Drive?"
-        description="Você precisará selecionar a pasta novamente. Seu progresso salvo neste dispositivo será apagado."
-        confirmLabel="Desconectar"
+        title="Restaurar dados de exemplo?"
+        description="Sua biblioteca e banco de questões importados neste dispositivo serão substituídos pelos dados fictícios de demonstração."
+        confirmLabel="Restaurar"
         danger
-        onConfirm={handleDisconnect}
+        onConfirm={handleReset}
         onCancel={() => setConfirmOpen(false)}
       />
     </div>

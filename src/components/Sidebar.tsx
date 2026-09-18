@@ -5,12 +5,12 @@ import { usePathname } from "next/navigation";
 import { GraduationCap } from "lucide-react";
 import { NAV_ITEMS } from "@/lib/nav";
 import { cn } from "@/lib/utils";
-import { useStudyStore } from "@/lib/store";
+import { useContentStore } from "@/lib/contentStore";
 import { ThemeToggle } from "./ThemeToggle";
 
 export function Sidebar() {
   const pathname = usePathname();
-  const demoMode = useStudyStore((s) => s.demoMode);
+  const hasImported = useContentStore((s) => s.hasImported);
 
   return (
     <aside className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 border-r border-border bg-surface">
@@ -48,7 +48,7 @@ export function Sidebar() {
       </nav>
 
       <div className="flex items-center justify-between px-4 py-4 border-t border-border">
-        <p className="text-xs text-muted-foreground">{demoMode ? "Modo demonstração" : "Google Drive conectado"}</p>
+        <p className="text-xs text-muted-foreground">{hasImported ? "Biblioteca importada" : "Dados de exemplo"}</p>
         <ThemeToggle />
       </div>
     </aside>

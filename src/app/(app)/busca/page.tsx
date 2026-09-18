@@ -32,7 +32,7 @@ function BuscaContent() {
     return content
       .filter((c) => {
         if (!q) return true;
-        const haystack = normalize(`${c.displayTitle} ${c.name} ${c.topic} ${c.folderPath.join(" ")}`);
+        const haystack = normalize(`${c.displayTitle} ${c.subjectName} ${c.topic} ${c.modulo ?? ""}`);
         return haystack.includes(q);
       })
       .filter((c) => {

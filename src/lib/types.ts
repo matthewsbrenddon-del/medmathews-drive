@@ -1,58 +1,48 @@
 // ============================================================================
-// Tipos centrais do MedStudy Hub
+// Tipos centrais do MedStudy Hub v2
 //
-// Separação deliberada (ver spec seção 16):
-//  - "Drive*" -> espelha o que vem do Google Drive (imutável do ponto de vista
-//    do usuário; atualizado apenas por uma sincronização).
-//  - "UserFileState" -> estado do usuário sobre um arquivo (assistido,
-//    favorito, progresso...). Persistido separadamente, nunca perdido em uma
-//    nova sincronização.
+// Sem integração OAuth com o Drive (ver README): todo conteúdo vem de uma
+// planilha .xlsx importada pelo usuário (src/lib/importCourses.ts) e todo
+// item é identificado pelo `fileId` do Google Drive — nunca pelo título,
+// nunca pelo nome do arquivo. Reimportar a planilha faz upsert por
+// `fileId` e nunca perde o progresso do usuário (`ItemProgress`, guardado
+// à parte, indexado por `fileId`/`questionId`).
 // ============================================================================
 
 export type ContentKind = "videoaula" | "apostila" | "outro";
 
 export type WatchStatus = "nao_iniciada" | "em_andamento" | "assistida";
 export type ReadStatus = "nao_acessado" | "acessado" | "estudado";
+export type QuestionStatus = "nao_respondida" | "acertada" | "errada";
 
-/** Formatos reconhecidos como videoaula. */
-export const VIDEO_EXTENSIONS = ["mp4", "mov", "webm", "avi", "mkv"] as const;
-/** Formatos reconhecidos como apostila/material principal de leitura. */
-export const DOCUMENT_EXTENSIONS = ["pdf", "doc", "docx", "ppt", "pptx", "epub"] as const;
-
-export interface DriveFileMeta {
-  /** Google Drive file ID — identificador primário, nunca o nome do arquivo. */
+/** Um item de conteúdo (aula ou material), vindo da planilha de cursos. */
+export interface StudyContent {
+  /** ID do arquivo no Google Drive — chave primária, nunca o título. */
   fileId: string;
-  /** ID da pasta imediata no Drive. */
-  folderId: string;
-  /** Caminho completo de pastas, ex: "MEDICINA/Anatomia/Videoaulas". */
-  folderPath: string[];
-  name: string;
-  mimeType: string;
-  /** Extensão normalizada em minúsculas, sem ponto. */
-  extension: string;
-  sizeBytes: number;
-  modifiedAt: string; // ISO date
-  /** URL para abrir o item diretamente no Google Drive. */
+  /** Link original compartilhado (ou reconstruído a partir do ID). */
   webViewUrl: string;
-  /** URL de preview embutido (iframe), quando aplicável. */
-  embedUrl?: string;
-  thumbnailUrl?: string;
-  /** Duração em segundos, quando disponível (apenas vídeos). */
-  durationSeconds?: number;
-}
-
-export interface StudyContent extends DriveFileMeta {
+  /** URL de preview embutido (`/preview`) — funciona para vídeo e PDF. */
+  embedUrl: string;
   kind: ContentKind;
-  /** Disciplina inferida ou confirmada pelo usuário. */
+  /** Slug da disciplina (derivado do nome informado na planilha). */
   subjectSlug: string;
-  /** Número da aula, quando identificado no nome do arquivo. */
+  /** Nome da disciplina exatamente como veio na planilha. */
+  subjectName: string;
+  modulo?: string;
   lessonNumber?: number;
-  /** Tema/assunto inferido do nome do arquivo. */
-  topic: string;
-  /** Título de exibição, já limpo/formatado. */
   displayTitle: string;
-  description?: string;
-  /** true quando a heurística de classificação teve baixa confiança. */
+  /** Tema/assunto do item. */
+  topic: string;
+  /** Extensão/formato aproximado, usado só para escolher o ícone (mp4, pdf, pptx...). */
+  extension: string;
+  durationSeconds?: number;
+  thumbnailUrl?: string;
+  /** Posição relativa dentro do módulo/disciplina, para ordenar a exibição e o cronograma. */
+  ordem: number;
+  /** 1 (baixa) a 5 (alta) — usada pelo cronograma adaptativo. */
+  priority: number;
+  observacoes?: string;
+  /** true quando a linha da planilha tinha algo ambíguo (ex.: disciplina não reconhecida). */
   needsReview?: boolean;
 }
 
@@ -64,8 +54,8 @@ export interface Subject {
   icon: string;
 }
 
-/** Estado do usuário para um item — a parte "nunca perdida" numa nova sync. */
-export interface UserFileState {
+/** Estado do usuário para um item de conteúdo — nunca perdido numa reimportação. */
+export interface ContentProgress {
   fileId: string;
   watchStatus?: WatchStatus;
   readStatus?: ReadStatus;
@@ -78,10 +68,54 @@ export interface UserFileState {
   completedAt?: string; // ISO date
 }
 
-export interface SyncSummary {
-  connectedFolderName: string;
-  totalVideos: number;
-  totalMaterials: number;
-  totalSubjects: number;
-  lastSyncedAt: string;
+// ---------------------------------------------------------------------------
+// Banco de questões (spec v2, seção 3)
+// ---------------------------------------------------------------------------
+
+export interface QuestionAlternative {
+  letter: "A" | "B" | "C" | "D" | "E";
+  text: string;
+}
+
+export interface Question {
+  id: string;
+  subjectSlug: string;
+  subjectName: string;
+  tema?: string;
+  banca?: string;
+  ano?: number;
+  enunciado: string;
+  alternatives: QuestionAlternative[];
+  /** Letra da alternativa correta. */
+  gabarito: string;
+  comentario?: string;
+  /** 1 (fácil) a 5 (difícil). */
+  dificuldade: number;
+  tags: string[];
+  observacoes?: string;
+  hasImage?: boolean;
+}
+
+/** Estado do usuário para uma questão — histórico usado na revisão espaçada simples. */
+export interface QuestionProgress {
+  questionId: string;
+  status: QuestionStatus;
+  /** Acertos seguidos mais recentes — sai da fila de revisão ao chegar em 2. */
+  correctStreak: number;
+  favorite: boolean;
+  lastAnsweredAt?: string;
+  history: { answeredAt: string; selected: string; correct: boolean }[];
+}
+
+export interface ImportSummary {
+  fileName: string;
+  importedAt: string;
+  totalRows: number;
+  imported: number;
+  skipped: number;
+}
+
+export interface ImportRowError {
+  row: number;
+  message: string;
 }

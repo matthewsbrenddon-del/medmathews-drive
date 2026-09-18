@@ -10,7 +10,7 @@ export function PriorityBadge({ priority, className }: { priority: number; class
     <span
       title={`${label} (${clamped}/5)`}
       className={cn(
-        "inline-flex items-center gap-0.5",
+        "inline-flex items-center gap-0.5 font-metric text-xs",
         clamped >= 4 ? "text-danger" : clamped === 3 ? "text-warning" : "text-muted-foreground",
         className
       )}

@@ -8,40 +8,48 @@ const config: Config = {
       fontFamily: {
         sans: ["var(--font-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
         serif: ["var(--font-serif)", "ui-serif", "Georgia", "serif"],
+        mono: ["var(--font-mono)", "ui-monospace", "SFMono-Regular", "monospace"],
       },
       colors: {
-        background: "hsl(var(--background))",
-        surface: "hsl(var(--surface))",
-        "surface-hover": "hsl(var(--surface-hover))",
-        border: "hsl(var(--border))",
-        foreground: "hsl(var(--foreground))",
-        muted: "hsl(var(--muted))",
-        "muted-foreground": "hsl(var(--muted-foreground))",
+        // O padrão `hsl(var(--x) / <alpha-value>)` permite usar modificadores
+        // de opacidade do Tailwind (ex.: `border-border/60`, `bg-primary/10`)
+        // em cima dos mesmos tokens semânticos.
+        background: "hsl(var(--background) / <alpha-value>)",
+        surface: "hsl(var(--surface) / <alpha-value>)",
+        "surface-hover": "hsl(var(--surface-hover) / <alpha-value>)",
+        border: "hsl(var(--border) / <alpha-value>)",
+        foreground: "hsl(var(--foreground) / <alpha-value>)",
+        muted: "hsl(var(--muted) / <alpha-value>)",
+        "muted-foreground": "hsl(var(--muted-foreground) / <alpha-value>)",
         primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
-          light: "hsl(var(--primary-light))",
+          DEFAULT: "hsl(var(--primary) / <alpha-value>)",
+          foreground: "hsl(var(--primary-foreground) / <alpha-value>)",
+          light: "hsl(var(--primary-light) / <alpha-value>)",
         },
         accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
+          DEFAULT: "hsl(var(--accent) / <alpha-value>)",
+          foreground: "hsl(var(--accent-foreground) / <alpha-value>)",
         },
         success: {
-          DEFAULT: "hsl(var(--success))",
-          foreground: "hsl(var(--success-foreground))",
+          DEFAULT: "hsl(var(--success) / <alpha-value>)",
+          foreground: "hsl(var(--success-foreground) / <alpha-value>)",
         },
-        warning: "hsl(var(--warning))",
-        danger: "hsl(var(--danger))",
+        warning: "hsl(var(--warning) / <alpha-value>)",
+        danger: "hsl(var(--danger) / <alpha-value>)",
       },
       borderRadius: {
-        xl: "1rem",
-        "2xl": "1.25rem",
-        "3xl": "1.75rem",
+        lg: "0.5rem",
+        xl: "0.85rem",
+        "2xl": "1.1rem",
+        "3xl": "1.5rem",
       },
       boxShadow: {
-        soft: "0 1px 2px 0 rgb(15 23 42 / 0.04), 0 2px 8px -2px rgb(15 23 42 / 0.06)",
-        card: "0 1px 3px 0 rgb(15 23 42 / 0.06), 0 8px 24px -8px rgb(15 23 42 / 0.10)",
-        lift: "0 4px 16px -4px rgb(15 23 42 / 0.12), 0 12px 32px -8px rgb(15 23 42 / 0.14)",
+        // Sombras discretas — a delimitação vem principalmente das
+        // micro-bordas (border-border/60), não de sombra difusa pesada.
+        soft: "0 1px 0 0 rgb(0 0 0 / 0.2)",
+        card: "0 1px 2px 0 rgb(0 0 0 / 0.24)",
+        lift: "0 4px 20px -6px rgb(0 0 0 / 0.4)",
+        glow: "0 0 0 1px hsl(var(--primary) / 0.25), 0 0 24px -8px hsl(var(--primary) / 0.35)",
       },
       keyframes: {
         "fade-in": {

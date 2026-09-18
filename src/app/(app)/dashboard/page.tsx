@@ -28,25 +28,25 @@ export default function DashboardPage() {
       </div>
 
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-4" aria-label="Resumo geral">
-        <DashboardCard icon={TrendingUp} label="Progresso total" value={`${overall.percent}%`} accentToken="217 65% 30%" />
+        <DashboardCard icon={TrendingUp} label="Progresso total" value={`${overall.percent}%`} accentToken="var(--primary)" />
         <DashboardCard
           icon={Video}
           label="Aulas assistidas"
           value={`${overall.watchedLessons} / ${overall.totalLessons}`}
-          accentToken="199 75% 42%"
+          accentToken="var(--accent)"
         />
         <DashboardCard
           icon={BookOpen}
           label="Materiais estudados"
           value={`${overall.studiedMaterials} / ${overall.totalMaterials}`}
-          accentToken="152 55% 36%"
+          accentToken="var(--success)"
         />
         <DashboardCard
           icon={Clock}
           label="Tempo de estudo"
           value={formatDuration(overall.totalStudySeconds)}
           sublabel="em videoaulas assistidas"
-          accentToken="38 92% 50%"
+          accentToken="var(--warning)"
         />
       </section>
 

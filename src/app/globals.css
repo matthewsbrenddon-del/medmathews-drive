@@ -2,57 +2,66 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================================
+   Design system — "Dark HUD de Alta Precisão"
+   Preto profundo + superfícies em cinza neutro delimitadas por micro-bordas,
+   âmbar para métricas/ações centrais, roxo para módulos cognitivos (banco de
+   questões, cronograma). O tema escuro é a experiência principal; o claro
+   segue a mesma hierarquia semântica.
+   ========================================================================= */
+
 :root {
-  --background: 210 40% 98%;
+  --background: 40 6% 97%;
   --surface: 0 0% 100%;
-  --surface-hover: 210 40% 96%;
-  --border: 214 32% 91%;
-  --foreground: 222 47% 11%;
-  --muted: 210 40% 94%;
-  --muted-foreground: 215 16% 47%;
+  --surface-hover: 40 10% 94%;
+  --border: 240 6% 87%;
+  --foreground: 0 0% 9%;
+  --muted: 40 8% 94%;
+  --muted-foreground: 0 0% 40%;
 
-  --primary: 217 65% 30%;
-  --primary-foreground: 0 0% 100%;
-  --primary-light: 217 60% 94%;
+  --primary: 36 96% 46%;
+  --primary-foreground: 0 0% 9%;
+  --primary-light: 38 100% 94%;
 
-  --accent: 199 75% 42%;
+  --accent: 262 60% 52%;
   --accent-foreground: 0 0% 100%;
 
-  --success: 152 55% 36%;
+  --success: 152 55% 34%;
   --success-foreground: 0 0% 100%;
 
-  --warning: 38 92% 50%;
-  --danger: 0 72% 51%;
+  --warning: 25 90% 47%;
+  --danger: 0 70% 48%;
 
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "Source Serif 4", ui-serif, Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
 }
 
 .dark {
-  --background: 222 47% 8%;
-  --surface: 222 40% 11%;
-  --surface-hover: 222 35% 15%;
-  --border: 217 25% 20%;
-  --foreground: 210 40% 96%;
-  --muted: 217 30% 16%;
-  --muted-foreground: 215 20% 65%;
+  --background: 0 0% 4%;
+  --surface: 0 0% 7%;
+  --surface-hover: 0 0% 11%;
+  --border: 240 4% 20%;
+  --foreground: 0 0% 97%;
+  --muted: 0 0% 11%;
+  --muted-foreground: 0 0% 58%;
 
-  --primary: 213 78% 68%;
-  --primary-foreground: 222 47% 11%;
-  --primary-light: 217 40% 20%;
+  --primary: 38 92% 50%;
+  --primary-foreground: 0 0% 9%;
+  --primary-light: 38 55% 16%;
 
-  --accent: 199 80% 60%;
-  --accent-foreground: 222 47% 11%;
+  --accent: 263 75% 68%;
+  --accent-foreground: 0 0% 9%;
 
-  --success: 152 50% 48%;
-  --success-foreground: 222 47% 11%;
+  --success: 152 55% 45%;
+  --success-foreground: 0 0% 9%;
 
-  --warning: 38 92% 55%;
+  --warning: 27 95% 58%;
   --danger: 0 72% 62%;
 }
 
 * {
-  border-color: hsl(var(--border));
+  border-color: hsl(var(--border) / 0.6);
 }
 
 html {
@@ -67,7 +76,7 @@ body {
 }
 
 ::selection {
-  background-color: hsl(var(--primary) / 0.2);
+  background-color: hsl(var(--primary) / 0.25);
 }
 
 ::-webkit-scrollbar {
@@ -93,11 +102,11 @@ body {
 
 @layer components {
   .card {
-    @apply rounded-2xl border border-border bg-surface shadow-soft;
+    @apply rounded-xl border border-border/60 bg-surface shadow-card;
   }
 
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-50;
   }
   .btn-primary {
     @apply btn bg-primary text-primary-foreground hover:opacity-90;
@@ -106,7 +115,7 @@ body {
     @apply btn bg-muted text-foreground hover:bg-surface-hover;
   }
   .btn-outline {
-    @apply btn border border-border bg-transparent text-foreground hover:bg-surface-hover;
+    @apply btn border border-border/60 bg-transparent text-foreground hover:bg-surface-hover;
   }
   .btn-ghost {
     @apply btn bg-transparent text-foreground hover:bg-surface-hover;
@@ -116,6 +125,11 @@ body {
   }
 
   .input {
-    @apply w-full rounded-xl border border-border bg-surface px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-accent;
+    @apply w-full rounded-lg border border-border/60 bg-surface px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-accent;
+  }
+
+  /* Métricas, cronômetros, tags e códigos (ex.: 83%, 12:04, Q_01) — sempre em monoespaçada. */
+  .font-metric {
+    @apply font-mono tabular-nums;
   }
 }

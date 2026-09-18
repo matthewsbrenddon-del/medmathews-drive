@@ -131,7 +131,7 @@ function ItemRow({ item }: { item: PlanItem }) {
         <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
           <span>{item.subjectName}</span>
           <span aria-hidden>·</span>
-          <span className="inline-flex items-center gap-1">
+          <span className="inline-flex items-center gap-1 font-metric">
             <Clock size={11} /> {item.estimatedMinutes} min
           </span>
           <PriorityBadge priority={item.priority} />
@@ -223,7 +223,7 @@ function PlanView() {
               <div key={day.date} className="card p-5">
                 <div className="flex items-center justify-between mb-2">
                   <h2 className="font-semibold text-foreground">{formatDayLabel(day.date)}</h2>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-xs font-metric text-muted-foreground">
                     {day.totalMinutes} / {day.budgetMinutes} min
                   </span>
                 </div>

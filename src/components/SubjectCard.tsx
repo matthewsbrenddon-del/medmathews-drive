@@ -17,7 +17,7 @@ export function SubjectCard({ subject }: { subject: SubjectProgress }) {
         >
           <SubjectIcon name={subject.icon} size={19} />
         </div>
-        <span className="text-lg font-semibold text-foreground">{subject.percent}%</span>
+        <span className="text-lg font-semibold font-metric text-foreground">{subject.percent}%</span>
       </div>
 
       <div>

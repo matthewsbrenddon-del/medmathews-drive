@@ -38,7 +38,7 @@ export function ProgressCircle({
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-3xl font-semibold text-foreground">{label ?? `${clamped}%`}</span>
+        <span className="text-3xl font-semibold font-metric text-foreground">{label ?? `${clamped}%`}</span>
         {sublabel && <span className="text-xs text-muted-foreground mt-0.5">{sublabel}</span>}
       </div>
     </div>

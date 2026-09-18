@@ -189,7 +189,7 @@ function ProvaContent() {
           </p>
           <span
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium",
+              "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium font-metric",
               secondsLeft < 60 ? "bg-danger/10 text-danger" : "bg-muted text-foreground"
             )}
           >
@@ -204,7 +204,7 @@ function ProvaContent() {
               type="button"
               onClick={() => setCurrent(idx)}
               className={cn(
-                "h-8 w-8 rounded-lg text-xs font-medium border transition-colors",
+                "h-8 w-8 rounded-lg text-xs font-medium font-metric border transition-colors",
                 idx === current
                   ? "border-primary bg-primary text-primary-foreground"
                   : answers[q.id]

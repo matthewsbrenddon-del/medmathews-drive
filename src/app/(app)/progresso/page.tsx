@@ -81,7 +81,7 @@ export default function ProgressoPage() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-sm font-medium text-foreground truncate">{subject.name}</p>
-                  <span className="text-sm font-semibold text-foreground shrink-0">{subject.percent}%</span>
+                  <span className="text-sm font-semibold font-metric text-foreground shrink-0">{subject.percent}%</span>
                 </div>
                 <div className="mt-2">
                   <ProgressBar percent={subject.percent} colorToken={subject.colorToken} size="sm" />
@@ -110,7 +110,7 @@ export default function ProgressoPage() {
                 <Target size={26} />
               </div>
               <div>
-                <p className="text-2xl font-semibold text-foreground">{questionStats.overall.accuracyPercent}%</p>
+                <p className="text-2xl font-semibold font-metric text-foreground">{questionStats.overall.accuracyPercent}%</p>
                 <p className="text-sm text-muted-foreground">
                   {questionStats.overall.correct} acertos em {questionStats.overall.answered} questões respondidas
                 </p>
@@ -129,7 +129,7 @@ export default function ProgressoPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-3">
                       <p className="text-sm font-medium text-foreground truncate">{s.name}</p>
-                      <span className="text-xs text-muted-foreground shrink-0">
+                      <span className="text-xs font-metric text-muted-foreground shrink-0">
                         {s.correct}/{s.answered} · {s.accuracyPercent}%
                       </span>
                     </div>

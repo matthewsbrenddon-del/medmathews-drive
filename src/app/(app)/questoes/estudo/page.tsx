@@ -120,7 +120,7 @@ function EstudoContent() {
         <p className="text-sm text-muted-foreground">
           Questão {index + 1} de {queue.length}
         </p>
-        <p className="text-sm font-medium text-foreground">
+        <p className="text-sm font-medium font-metric text-foreground">
           {session.correct}/{session.answered} acertos nesta sessão
         </p>
       </div>

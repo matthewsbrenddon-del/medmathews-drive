@@ -66,6 +66,13 @@ const SUBJECT_ALIASES: Record<string, string> = {
   go: "ginecologia-obstetricia",
   cardio: "cardiologia",
   cardiologia: "cardiologia",
+  // Abreviações usadas em cursos preparatórios (ex.: "MED - CIR3 - Hemorragia
+  // Digestiva.mp4", "MED - CLM22 - Síndrome Edemigênica.pdf").
+  cir: "cirurgia",
+  clm: "clinica-medica",
+  gin: "ginecologia-obstetricia",
+  obs: "ginecologia-obstetricia",
+  ped: "pediatria",
 };
 
 function normalize(text: string): string {

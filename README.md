@@ -36,6 +36,15 @@ Veja `src/lib/importCourses.ts` e `src/lib/importQuestions.ts` para as regras de
 
 Em **Cronograma**, escolha as disciplinas a priorizar, uma data-alvo e quantos minutos por dia você tem disponíveis. O app distribui as aulas/materiais pendentes (respeitando a `Prioridade` da planilha e a duração de cada item) e blocos de questões pendentes/erradas entre os dias até a data-alvo. O plano é sempre recalculado a partir do progresso atual — nada fica "desatualizado": assim que você conclui algo, ele some do plano automaticamente. Dá para adiar qualquer item para o dia seguinte.
 
+## Biblioteca Completa (acervo mapeado)
+
+**Biblioteca Completa** é um navegador de pastas separado da grade curada de Disciplinas/Cronograma, para um acervo inteiro de materiais reais (cursinhos, e-books, bancos de questões em PDF) mapeado pelo usuário — hoje ~13,6 mil arquivos em `public/seed-data/library-mapeamento.json` (gerado a partir de `seed-data/MedStudyHub_Mapeamento_Materiais.xlsx`, colunas `Nome do curso, Área, Conteúdo, Link da aula/material`, com "Conteúdo" sendo o caminho de pastas até o arquivo separado por `›`).
+
+- Não entra no `contentStore`/`studyPlan` (o algoritmo de cronograma continua operando só sobre a grade curada — não faria sentido agendar 13,6 mil itens automaticamente).
+- `src/lib/libraryStore.ts` busca o JSON uma única vez por sessão, sem persistir em `localStorage` (grande demais e é referência estática, não estado do usuário).
+- `src/lib/library.ts` computa a navegação em árvore (pastas/arquivos por nível) e a busca sob demanda a partir da lista plana — sem manter uma árvore aninhada em memória.
+- Cada arquivo abre em `FilePreviewModal`, com o preview do Drive embutido num iframe diretamente na página (`/file/d/{id}/preview`) — nunca redireciona para fora da plataforma; o botão "Abrir no Google Drive" é só um atalho opcional.
+
 ## IA para flashcards e cronograma (opcional)
 
 Dois recursos adicionais — nunca substitutivos — usam a API da Claude quando `ANTHROPIC_API_KEY` está configurada (veja `.env.example`); sem a chave, ambos ficam indisponíveis com uma mensagem clara na interface e o resto da plataforma continua funcionando normalmente:

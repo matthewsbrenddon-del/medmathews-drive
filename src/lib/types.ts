@@ -11,6 +11,21 @@
 
 export type ContentKind = "videoaula" | "apostila" | "outro";
 
+// ---------------------------------------------------------------------------
+// Biblioteca completa (acervo mapeado pelo usuário — cursos/bancos de
+// questões inteiros, fora da grade curada de Disciplinas/Cronograma)
+// ---------------------------------------------------------------------------
+
+/** Uma linha do mapeamento completo de materiais (curso → área → arquivo). */
+export interface LibraryFile {
+  /** ID do arquivo no Google Drive — chave primária. */
+  id: string;
+  curso: string;
+  area: string;
+  /** Caminho bruto de pastas até o arquivo, separado por " › " — o último segmento é o nome do arquivo. */
+  conteudo: string;
+}
+
 export type WatchStatus = "nao_iniciada" | "em_andamento" | "assistida";
 export type ReadStatus = "nao_acessado" | "acessado" | "estudado";
 export type QuestionStatus = "nao_respondida" | "acertada" | "errada";

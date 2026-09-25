@@ -65,3 +65,58 @@ export function computeQuestionStats(
     bySubject,
   };
 }
+
+export interface TemaRecommendation {
+  tema: string;
+  subjectSlug: string;
+  subjectName: string;
+  colorToken: string;
+  answered: number;
+  correct: number;
+  accuracyPercent: number;
+}
+
+/**
+ * Diagnóstico de pontos fracos: para cada tema com pelo menos uma questão
+ * respondida, calcula o % de acerto (considerando a resposta mais recente
+ * de cada questão) e devolve os temas com pior desempenho primeiro — a
+ * base da seção "Temas recomendados para treino" em /questoes.
+ */
+export function getRecommendedTemas(
+  questions: Question[],
+  progressMap: Record<string, QuestionProgress>,
+  limit = 5
+): TemaRecommendation[] {
+  const byTema = new Map<string, TemaRecommendation>();
+
+  for (const question of questions) {
+    if (!question.tema) continue;
+    const progress = progressMap[question.id];
+    if (!progress || progress.history.length === 0) continue;
+
+    const subject = resolveSubject(question.subjectName);
+    const key = `${subject.slug}::${question.tema}`;
+    const entry =
+      byTema.get(key) ??
+      ({
+        tema: question.tema,
+        subjectSlug: subject.slug,
+        subjectName: subject.name,
+        colorToken: subject.colorToken,
+        answered: 0,
+        correct: 0,
+        accuracyPercent: 0,
+      } satisfies TemaRecommendation);
+
+    entry.answered += 1;
+    const lastCorrect = progress.history[progress.history.length - 1].correct;
+    if (lastCorrect) entry.correct += 1;
+    byTema.set(key, entry);
+  }
+
+  return Array.from(byTema.values())
+    .map((t) => ({ ...t, accuracyPercent: Math.round((t.correct / t.answered) * 100) }))
+    .filter((t) => t.accuracyPercent < 100)
+    .sort((a, b) => a.accuracyPercent - b.accuracyPercent || b.answered - a.answered)
+    .slice(0, limit);
+}

@@ -74,8 +74,8 @@ export function ImportQuestionsPanel({ onImported }: { onImported?: () => void }
         <div>
           <h3 className="font-semibold text-foreground">Importar banco de questões</h3>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Envie um .xlsx com Disciplina, Tema, Banca, Ano, Enunciado, Alternativas A–E, Gabarito, Comentário,
-            Dificuldade, Tags e Observações.
+            Envie um .xlsx com Disciplina, Tema, Subtema, Banca, Ano, Enunciado, Alternativas A–E, Gabarito,
+            Comentário, Dificuldade, Tags e Observações.
           </p>
         </div>
       </div>

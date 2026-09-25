@@ -1,7 +1,7 @@
 // ============================================================================
 // Importação do banco de questões (spec v2, seção 3)
 //
-// Colunas esperadas: Disciplina, Tema/Assunto, Banca, Ano, Enunciado,
+// Colunas esperadas: Disciplina, Tema, Subtema, Banca, Ano, Enunciado,
 // Alternativa A–E (E opcional), Gabarito, Comentário, Dificuldade, Tags,
 // Observações.
 // ============================================================================
@@ -13,7 +13,6 @@ import { normalizeText, seededHash } from "./utils";
 
 const COLUMNS = {
   disciplina: ["disciplina"],
-  tema: ["tema"],
   banca: ["banca"],
   ano: ["ano"],
   enunciado: ["enunciado"],
@@ -41,6 +40,19 @@ function findAlternativeColumns(headerRow: Parameters<typeof getHeaderCells>[0])
   return map;
 }
 
+/** "Subtema" contém a palavra "tema" como substring, então precisa de uma
+ * busca dedicada — senão a coluna Tema poderia acabar lendo os dados do
+ * Subtema (ou vice-versa) dependendo da ordem das colunas na planilha. */
+function findTemaColumns(headerRow: Parameters<typeof getHeaderCells>[0]): Record<string, number> {
+  const headerCells = getHeaderCells(headerRow);
+  const map: Record<string, number> = {};
+  const subtemaCol = headerCells.find((h) => /sub[\s-]?tema/.test(h.text));
+  if (subtemaCol) map.subtema = subtemaCol.index;
+  const temaCol = headerCells.find((h) => h.text.includes("tema") && h.index !== subtemaCol?.index);
+  if (temaCol) map.tema = temaCol.index;
+  return map;
+}
+
 export interface QuestionImportResult {
   items: Question[];
   errors: ImportRowError[];
@@ -50,7 +62,11 @@ export interface QuestionImportResult {
 export async function parseQuestionsWorkbook(buffer: ArrayBuffer, fileName: string): Promise<QuestionImportResult> {
   const worksheet = await loadWorkbook(buffer);
   const headerRow = worksheet.getRow(1);
-  const cols = { ...mapHeaders(headerRow, COLUMNS), ...findAlternativeColumns(headerRow) };
+  const cols = {
+    ...mapHeaders(headerRow, COLUMNS),
+    ...findAlternativeColumns(headerRow),
+    ...findTemaColumns(headerRow),
+  };
 
   if (!cols.disciplina || !cols.enunciado || !cols.gabarito) {
     throw new Error(
@@ -121,6 +137,7 @@ export async function parseQuestionsWorkbook(buffer: ArrayBuffer, fileName: stri
       subjectSlug: subject.slug,
       subjectName: subject.name,
       tema: get("tema") || undefined,
+      subtema: get("subtema") || undefined,
       banca: get("banca") || undefined,
       ano: cellToNumber(cols.ano ? row.getCell(cols.ano).value : undefined),
       enunciado,

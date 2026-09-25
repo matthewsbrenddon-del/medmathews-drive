@@ -1,12 +1,18 @@
 // ============================================================================
-// Dados de demonstração (spec v2)
+// Dados de demonstração (spec v2 + reorganização por grandes áreas)
 //
 // Mostrados apenas até o usuário importar sua primeira planilha de cursos
 // (ver src/lib/contentStore.ts) — a partir daí, o conteúdo real importado
-// substitui esses exemplos. Os títulos são fictícios (exceto os módulos de
-// Cirurgia/Clínica Médica/Ginecologia e Obstetrícia/Pediatria, que refletem
-// a base de conteúdos real compartilhada pelo usuário) e não constituem
-// conteúdo médico oficial.
+// substitui esses exemplos.
+//
+// Organização: as 5 grandes áreas do ENAMED (Clínica Médica, Cirurgia
+// Geral, Ginecologia e Obstetrícia, Pediatria, Preventiva e MFC), cada uma
+// subdividida em "frentes" (módulos: CLM1, CIR1, GIN1, OBS1, PED1, MFC1...).
+// Os módulos marcados abaixo como REAIS refletem a base de conteúdos
+// compartilhada pelo usuário; o restante é um esqueleto genérico dos temas
+// mais cobrados no ENAMED para completar cada área a pelo menos 5 frentes,
+// para ser substituído pela grade real assim que ela for organizada.
+// Nada aqui constitui conteúdo médico oficial.
 // ============================================================================
 
 import { drivePreviewUrl, driveViewUrl } from "./driveLink";
@@ -14,91 +20,8 @@ import { KNOWN_SUBJECTS } from "./subjects";
 import { seededHash } from "./utils";
 import type { StudyContent } from "./types";
 
-interface SubjectSeed {
-  slug: string;
-  lessons: string[];
-  materials: string[];
-}
-
-// Títulos realistas por disciplina — inspirados nos exemplos da especificação.
-const SEEDS: SubjectSeed[] = [
-  {
-    slug: "anatomia",
-    lessons: [
-      "Introdução ao Sistema Musculoesquelético",
-      "Ossos do Crânio e Face",
-      "Coluna Vertebral e Curvaturas",
-      "Membro Superior: Ombro e Braço",
-      "Membro Inferior: Quadril e Coxa",
-      "Sistema Articular",
-      "Anatomia do Tórax",
-      "Anatomia do Abdome",
-    ],
-    materials: [
-      "Anatomia Geral — Apostila Completa",
-      "Sistema Ósseo — Resumo Ilustrado",
-      "Atlas de Anatomia Muscular",
-      "Roteiro de Dissecção — Membros",
-      "Lista de Exercícios — Osteologia",
-    ],
-  },
-  {
-    slug: "fisiologia",
-    lessons: [
-      "Homeostase e Meio Interno",
-      "Membrana Celular e Transporte",
-      "Potencial de Repouso",
-      "Potencial de Ação",
-      "Fisiologia da Contração Muscular",
-      "Fisiologia Cardiovascular I",
-      "Fisiologia Respiratória",
-      "Fisiologia Renal — Filtração Glomerular",
-    ],
-    materials: [
-      "Fisiologia Celular — Apostila",
-      "Eletrofisiologia — Resumo",
-      "Ciclo Cardíaco — Slides",
-      "Fisiologia Respiratória — Guia de Estudo",
-    ],
-  },
-  {
-    slug: "bioquimica",
-    lessons: [
-      "Estrutura de Aminoácidos e Proteínas",
-      "Enzimas e Cinética Enzimática",
-      "Glicólise",
-      "Ciclo de Krebs",
-      "Cadeia Transportadora de Elétrons",
-      "Metabolismo de Lipídeos",
-      "Metabolismo de Proteínas e Ciclo da Ureia",
-    ],
-    materials: ["Bioquímica Estrutural — Apostila", "Vias Metabólicas — Mapa Resumo", "Bioenergética — Slides"],
-  },
-  {
-    slug: "histologia",
-    lessons: ["Tecido Epitelial", "Tecido Conjuntivo", "Tecido Muscular", "Tecido Nervoso"],
-    materials: ["Atlas de Histologia Básica", "Tecidos Fundamentais — Resumo"],
-  },
-  {
-    slug: "farmacologia",
-    lessons: [
-      "Princípios de Farmacodinâmica",
-      "Farmacocinética",
-      "Vias de Administração de Fármacos",
-      "Anti-inflamatórios Não Esteroidais",
-      "Antibióticos — Classes e Mecanismos",
-    ],
-    materials: ["Farmacologia Geral — Apostila", "Interações Medicamentosas — Resumo"],
-  },
-  {
-    slug: "cardiologia",
-    lessons: ["Eletrocardiograma — Interpretação Básica", "Síndromes Coronarianas Agudas", "Arritmias Cardíacas"],
-    materials: ["ECG — Guia de Bolso"],
-  },
-];
-
-interface RealModule {
-  /** Código do módulo como aparece nos arquivos reais (ex.: "CIR3"). */
+interface CourseModule {
+  /** Código da frente (ex.: "CIR3") — vira o campo `modulo`. */
   code: string;
   subjectSlug: string;
   title: string;
@@ -106,27 +29,8 @@ interface RealModule {
   topics: string[];
 }
 
-// Base de conteúdos real informada pelo usuário (curso preparatório de
-// Medicina) — cada módulo vira uma videoaula + uma apostila companheira.
-const REAL_MODULES: RealModule[] = [
-  {
-    code: "CIR3",
-    subjectSlug: "cirurgia",
-    title: "Hemorragia Digestiva",
-    topics: [
-      "Abordagem Inicial da Hemorragia Digestiva Aguda",
-      "Hemorragia Digestiva Alta",
-      "Hemorragia Digestiva Baixa",
-      "Doenças Anorretais",
-      "Apêndices",
-    ],
-  },
-  {
-    code: "CIR5",
-    subjectSlug: "cirurgia",
-    title: "Obstrução Intestinal",
-    topics: ["Síndrome de Obstrução Intestinal", "Causas de Obstrução Intestinal", "Hérnias da Parede Abdominal"],
-  },
+const MODULES: CourseModule[] = [
+  // --- Clínica Médica (reais) -----------------------------------------
   {
     code: "CLM1",
     subjectSlug: "clinica-medica",
@@ -168,6 +72,100 @@ const REAL_MODULES: RealModule[] = [
     title: "Síndrome Edemigênica",
     topics: ["A Síndrome Edemigênica", "Insuficiência Cardíaca", "Outras Causas de Edema", "Apêndices"],
   },
+
+  // --- Cirurgia Geral (CIR3 e CIR5 reais; CIR1/2/4 genéricos ENAMED) ---
+  {
+    code: "CIR1",
+    subjectSlug: "cirurgia-geral",
+    title: "Cuidados Perioperatórios",
+    topics: [
+      "Avaliação Pré-operatória e Risco Cirúrgico",
+      "Cuidados Pós-operatórios Gerais",
+      "Complicações Cirúrgicas Comuns",
+      "Nutrição e Cicatrização",
+      "Apêndices",
+    ],
+  },
+  {
+    code: "CIR2",
+    subjectSlug: "cirurgia-geral",
+    title: "Trauma e Abdome Agudo",
+    topics: [
+      "Atendimento Inicial ao Politraumatizado",
+      "Trauma Abdominal",
+      "Abdome Agudo Inflamatório",
+      "Abdome Agudo Perfurativo e Obstrutivo",
+      "Apêndices",
+    ],
+  },
+  {
+    code: "CIR3",
+    subjectSlug: "cirurgia-geral",
+    title: "Hemorragia Digestiva",
+    topics: [
+      "Abordagem Inicial da Hemorragia Digestiva Aguda",
+      "Hemorragia Digestiva Alta",
+      "Hemorragia Digestiva Baixa",
+      "Doenças Anorretais",
+      "Apêndices",
+    ],
+  },
+  {
+    code: "CIR4",
+    subjectSlug: "cirurgia-geral",
+    title: "Vias Biliares e Pâncreas",
+    topics: [
+      "Colelitíase e Coledocolitíase",
+      "Colecistite Aguda",
+      "Pancreatite Aguda e Crônica",
+      "Neoplasias Pancreáticas e Periampulares",
+      "Apêndices",
+    ],
+  },
+  {
+    code: "CIR5",
+    subjectSlug: "cirurgia-geral",
+    title: "Obstrução Intestinal",
+    topics: ["Síndrome de Obstrução Intestinal", "Causas de Obstrução Intestinal", "Hérnias da Parede Abdominal"],
+  },
+
+  // --- Ginecologia (GIN4 e GIN5 reais; GIN1/2/3 genéricos ENAMED) ------
+  {
+    code: "GIN1",
+    subjectSlug: "ginecologia-obstetricia",
+    title: "Propedêutica Ginecológica e Ciclo Menstrual",
+    topics: [
+      "Fisiologia do Ciclo Menstrual",
+      "Exame Ginecológico e Rastreamento",
+      "Doenças Sexualmente Transmissíveis",
+      "Doença Inflamatória Pélvica",
+      "Apêndices",
+    ],
+  },
+  {
+    code: "GIN2",
+    subjectSlug: "ginecologia-obstetricia",
+    title: "Patologia do Colo Uterino e Mama",
+    topics: [
+      "Rastreamento e Lesões Precursoras do Colo Uterino",
+      "Câncer de Colo Uterino",
+      "Doenças Benignas da Mama",
+      "Câncer de Mama — Rastreamento e Diagnóstico",
+      "Apêndices",
+    ],
+  },
+  {
+    code: "GIN3",
+    subjectSlug: "ginecologia-obstetricia",
+    title: "Climatério e Uroginecologia",
+    topics: [
+      "Síndrome Climatérica e Terapia Hormonal",
+      "Incontinência Urinária Feminina",
+      "Prolapsos Genitais",
+      "Osteoporose Pós-menopausa",
+      "Apêndices",
+    ],
+  },
   {
     code: "GIN4",
     subjectSlug: "ginecologia-obstetricia",
@@ -188,6 +186,32 @@ const REAL_MODULES: RealModule[] = [
       "Apêndices",
     ],
   },
+
+  // --- Obstetrícia (OBS3 real; OBS1/2/4/5 genéricos ENAMED) ------------
+  {
+    code: "OBS1",
+    subjectSlug: "ginecologia-obstetricia",
+    title: "Pré-natal e Assistência ao Parto Normal",
+    topics: [
+      "Diagnóstico de Gravidez e Idade Gestacional",
+      "Roteiro do Pré-natal de Baixo Risco",
+      "Mecanismo e Assistência ao Parto Normal",
+      "Partograma",
+      "Apêndices",
+    ],
+  },
+  {
+    code: "OBS2",
+    subjectSlug: "ginecologia-obstetricia",
+    title: "Síndromes Hipertensivas da Gestação",
+    topics: [
+      "Hipertensão Gestacional e Pré-eclâmpsia",
+      "Eclâmpsia e Síndrome HELLP",
+      "Diabetes Mellitus Gestacional",
+      "Doença Hemolítica Perinatal",
+      "Apêndices",
+    ],
+  },
   {
     code: "OBS3",
     subjectSlug: "ginecologia-obstetricia",
@@ -202,6 +226,31 @@ const REAL_MODULES: RealModule[] = [
     ],
   },
   {
+    code: "OBS4",
+    subjectSlug: "ginecologia-obstetricia",
+    title: "Sangramentos na Gestação",
+    topics: [
+      "Sangramentos da Primeira Metade (Abortamento, Ectópica, Mola)",
+      "Sangramentos da Segunda Metade (Placenta Prévia, DPP)",
+      "Rotura Uterina",
+      "Apêndices",
+    ],
+  },
+  {
+    code: "OBS5",
+    subjectSlug: "ginecologia-obstetricia",
+    title: "Trabalho de Parto Prematuro e Gestação de Alto Risco",
+    topics: [
+      "Trabalho de Parto Pré-termo",
+      "Amniorrexe Prematura",
+      "Gestação Múltipla",
+      "Infecções Congênitas na Gestação",
+      "Apêndices",
+    ],
+  },
+
+  // --- Pediatria (PED1/4/5 reais; PED2/3 genéricos ENAMED) -------------
+  {
     code: "PED1",
     subjectSlug: "pediatria",
     title: "Síndromes Exantemáticas",
@@ -211,6 +260,30 @@ const REAL_MODULES: RealModule[] = [
       "Doenças Exantemáticas Bacterianas",
       "Doenças Exantemáticas Reumatológicas",
       "Apêndice",
+    ],
+  },
+  {
+    code: "PED2",
+    subjectSlug: "pediatria",
+    title: "Aleitamento Materno e Nutrição Infantil",
+    topics: [
+      "Aleitamento Materno — Técnica e Benefícios",
+      "Introdução Alimentar",
+      "Desnutrição e Obesidade Infantil",
+      "Distúrbios Nutricionais Carenciais",
+      "Apêndices",
+    ],
+  },
+  {
+    code: "PED3",
+    subjectSlug: "pediatria",
+    title: "Doenças Respiratórias na Infância",
+    topics: [
+      "Infecções de Vias Aéreas Superiores",
+      "Bronquiolite Viral Aguda",
+      "Pneumonias na Infância",
+      "Asma na Criança",
+      "Apêndices",
     ],
   },
   {
@@ -230,6 +303,62 @@ const REAL_MODULES: RealModule[] = [
     subjectSlug: "pediatria",
     title: "Síndromes Ponderoestaturais, Puberais e do Desenvolvimento",
     topics: ["Crescimento", "Distúrbios do Crescimento", "Puberdade e Seus Distúrbios", "Apêndices"],
+  },
+
+  // --- Preventiva e MFC (todos genéricos ENAMED — área nova) -----------
+  {
+    code: "MFC1",
+    subjectSlug: "preventiva-mfc",
+    title: "Atenção Primária à Saúde e SUS",
+    topics: [
+      "Princípios e Diretrizes do SUS",
+      "Estratégia Saúde da Família",
+      "Níveis de Atenção e Redes de Atenção à Saúde",
+      "Determinantes Sociais da Saúde",
+      "Apêndices",
+    ],
+  },
+  {
+    code: "MFC2",
+    subjectSlug: "preventiva-mfc",
+    title: "Epidemiologia e Indicadores de Saúde",
+    topics: [
+      "Medidas de Frequência e Associação",
+      "Estudos Epidemiológicos",
+      "Indicadores de Saúde e Mortalidade",
+      "Vigilância Epidemiológica",
+      "Apêndices",
+    ],
+  },
+  {
+    code: "MFC3",
+    subjectSlug: "preventiva-mfc",
+    title: "Imunização e Vigilância em Saúde",
+    topics: [
+      "Calendário Nacional de Vacinação",
+      "Doenças de Notificação Compulsória",
+      "Vigilância Sanitária e Ambiental",
+      "Investigação de Surtos",
+      "Apêndices",
+    ],
+  },
+  {
+    code: "MFC4",
+    subjectSlug: "preventiva-mfc",
+    title: "Saúde da Criança, do Idoso e Saúde Mental na APS",
+    topics: [
+      "Puericultura na Atenção Primária",
+      "Saúde do Idoso e Fragilidade",
+      "Saúde Mental na Atenção Primária",
+      "Rastreamentos na APS",
+      "Apêndices",
+    ],
+  },
+  {
+    code: "MFC5",
+    subjectSlug: "preventiva-mfc",
+    title: "Bioética e Ética Médica",
+    topics: ["Princípios da Bioética", "Relação Médico-Paciente", "Sigilo Médico e Prontuário", "Ética em Pesquisa"],
   },
 ];
 
@@ -255,45 +384,11 @@ function generateDemoContent(): StudyContent[] {
   const items: StudyContent[] = [];
   let ordem = 0;
 
-  for (const seed of SEEDS) {
-    const subjectName = subjectNameFor(seed.slug);
-
-    seed.lessons.forEach((topic, idx) => {
-      const lessonNumber = idx + 1;
-      const file = demoFile(`${seed.slug}-video-${lessonNumber}`, "videoaula");
-      items.push({
-        ...file,
-        kind: "videoaula",
-        subjectSlug: seed.slug,
-        subjectName,
-        lessonNumber,
-        displayTitle: `Aula ${String(lessonNumber).padStart(2, "0")} — ${topic}`,
-        topic,
-        ordem: ordem++,
-        needsReview: false,
-      });
-    });
-
-    seed.materials.forEach((title, idx) => {
-      const file = demoFile(`${seed.slug}-material-${idx}`, "apostila");
-      items.push({
-        ...file,
-        kind: "apostila",
-        subjectSlug: seed.slug,
-        subjectName,
-        displayTitle: title,
-        topic: title,
-        ordem: ordem++,
-        needsReview: false,
-      });
-    });
-  }
-
-  for (const courseModule of REAL_MODULES) {
+  for (const courseModule of MODULES) {
     const subjectName = subjectNameFor(courseModule.subjectSlug);
     const summary = courseModule.topics.join(" · ");
 
-    const videoFile = demoFile(`real-${courseModule.code}-video`, "videoaula");
+    const videoFile = demoFile(`${courseModule.code}-video`, "videoaula");
     items.push({
       ...videoFile,
       kind: "videoaula",
@@ -306,7 +401,7 @@ function generateDemoContent(): StudyContent[] {
       needsReview: false,
     });
 
-    const materialFile = demoFile(`real-${courseModule.code}-material`, "apostila");
+    const materialFile = demoFile(`${courseModule.code}-material`, "apostila");
     items.push({
       ...materialFile,
       kind: "apostila",

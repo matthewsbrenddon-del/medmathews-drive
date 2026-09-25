@@ -1,5 +1,17 @@
 import type { LucideIcon } from "lucide-react";
-import { BookOpen, Brain, Calendar, Home, LayoutGrid, Search, Settings, Star, Video, TrendingUp } from "lucide-react";
+import {
+  BookOpen,
+  Brain,
+  Calendar,
+  Home,
+  LayoutGrid,
+  Layers,
+  Search,
+  Settings,
+  Star,
+  Video,
+  TrendingUp,
+} from "lucide-react";
 
 export interface NavItem {
   href: string;
@@ -15,6 +27,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/videoaulas", label: "Videoaulas", icon: Video },
   { href: "/materiais", label: "Apostilas e Materiais", icon: BookOpen },
   { href: "/questoes", label: "Questões", icon: Brain, mobile: true },
+  { href: "/flashcards", label: "Flashcards", icon: Layers },
   { href: "/cronograma", label: "Cronograma", icon: Calendar },
   { href: "/busca", label: "Busca", icon: Search, mobile: true },
   { href: "/progresso", label: "Meu Progresso", icon: TrendingUp, mobile: true },

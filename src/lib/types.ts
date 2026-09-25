@@ -82,6 +82,7 @@ export interface Question {
   subjectSlug: string;
   subjectName: string;
   tema?: string;
+  subtema?: string;
   banca?: string;
   ano?: number;
   enunciado: string;
@@ -105,6 +106,41 @@ export interface QuestionProgress {
   favorite: boolean;
   lastAnsweredAt?: string;
   history: { answeredAt: string; selected: string; correct: boolean }[];
+}
+
+// ---------------------------------------------------------------------------
+// Flashcards (decks + repetição espaçada simples estilo Leitner)
+// ---------------------------------------------------------------------------
+
+export interface FlashcardDeck {
+  id: string;
+  name: string;
+  subjectSlug?: string;
+  description?: string;
+  createdAt: string;
+}
+
+export interface Flashcard {
+  id: string;
+  deckId: string;
+  subjectSlug?: string;
+  subjectName?: string;
+  front: string;
+  back: string;
+  tags: string[];
+  /** Preenchido quando o card foi gerado automaticamente a partir de uma questão do banco. */
+  sourceQuestionId?: string;
+  createdAt: string;
+}
+
+/** Caixa de Leitner (1 = recém-visto/errado, 5 = dominado) — determina o
+ * intervalo até a próxima revisão. */
+export interface FlashcardProgress {
+  cardId: string;
+  box: number;
+  dueDate: string; // ISO date (yyyy-mm-dd)
+  lastReviewedAt?: string;
+  reviewCount: number;
 }
 
 export interface ImportSummary {

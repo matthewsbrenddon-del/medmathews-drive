@@ -22,11 +22,16 @@ function EstudoContent() {
   const toggleFavorite = useQuestionProgressStore((s) => s.toggleFavorite);
   const recordStudyToday = useStudyStore((s) => s.recordStudyToday);
 
+  const tagsParam = searchParams.get("tags");
   const filters: QuestionFilters = {
     disciplina: searchParams.get("disciplina") ?? undefined,
+    tema: searchParams.get("tema") ?? undefined,
+    subtema: searchParams.get("subtema") ?? undefined,
+    tags: tagsParam ? tagsParam.split(",") : undefined,
     banca: searchParams.get("banca") ?? undefined,
     ano: searchParams.get("ano") ?? undefined,
     dificuldade: searchParams.get("dificuldade") ?? undefined,
+    status: searchParams.get("status") ?? undefined,
     modo: searchParams.get("modo") === "revisao" ? "revisao" : undefined,
   };
   const startId = searchParams.get("start");

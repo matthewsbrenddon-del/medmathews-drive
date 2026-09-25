@@ -10,6 +10,7 @@ import type { Question, QuestionAlternative } from "./types";
 interface QuestionSeed {
   subjectSlug: string;
   tema: string;
+  subtema?: string;
   banca?: string;
   ano?: number;
   enunciado: string;
@@ -22,8 +23,9 @@ interface QuestionSeed {
 
 const SEEDS: QuestionSeed[] = [
   {
-    subjectSlug: "cardiologia",
+    subjectSlug: "clinica-medica",
     tema: "Insuficiência Cardíaca",
+    subtema: "Tratamento Farmacológico",
     banca: "Exemplo",
     ano: 2023,
     enunciado:
@@ -43,6 +45,7 @@ const SEEDS: QuestionSeed[] = [
   {
     subjectSlug: "clinica-medica",
     tema: "Síndrome Ictérica",
+    subtema: "Distúrbios da Bilirrubina",
     banca: "Exemplo",
     ano: 2022,
     enunciado:
@@ -55,7 +58,7 @@ const SEEDS: QuestionSeed[] = [
     tags: ["hepatologia"],
   },
   {
-    subjectSlug: "cirurgia",
+    subjectSlug: "cirurgia-geral",
     tema: "Hemorragia Digestiva",
     banca: "Exemplo",
     ano: 2023,
@@ -90,6 +93,7 @@ const SEEDS: QuestionSeed[] = [
   {
     subjectSlug: "ginecologia-obstetricia",
     tema: "Amenorreia, SOP e Infertilidade",
+    subtema: "Síndrome dos Ovários Policísticos",
     banca: "Exemplo",
     ano: 2022,
     enunciado:
@@ -107,7 +111,7 @@ const SEEDS: QuestionSeed[] = [
     tags: ["SOP"],
   },
   {
-    subjectSlug: "farmacologia",
+    subjectSlug: "clinica-medica",
     tema: "Farmacocinética",
     banca: "Exemplo",
     ano: 2023,
@@ -157,6 +161,33 @@ const SEEDS: QuestionSeed[] = [
     dificuldade: 3,
     tags: ["neonatologia"],
   },
+  {
+    subjectSlug: "preventiva-mfc",
+    tema: "Epidemiologia e Indicadores de Saúde",
+    banca: "Exemplo",
+    ano: 2023,
+    enunciado:
+      "Em um estudo de coorte, a incidência de uma doença foi de 4% no grupo exposto e 1% no grupo não exposto. Qual o risco relativo aproximado?",
+    alternatives: ["4", "0,25", "3", "1"],
+    gabaritoIndex: 0,
+    comentario:
+      "Risco relativo = incidência no expostos / incidência nos não expostos = 4%/1% = 4, indicando que o grupo exposto tem 4 vezes mais risco de desenvolver a doença.",
+    dificuldade: 2,
+    tags: ["epidemiologia", "risco relativo"],
+  },
+  {
+    subjectSlug: "preventiva-mfc",
+    tema: "Atenção Primária à Saúde e SUS",
+    banca: "Exemplo",
+    ano: 2022,
+    enunciado: "Qual atributo da Atenção Primária à Saúde caracteriza o acompanhamento contínuo do paciente ao longo do tempo, independentemente da presença de doença?",
+    alternatives: ["Longitudinalidade", "Integralidade", "Coordenação do cuidado", "Acesso de primeiro contato"],
+    gabaritoIndex: 0,
+    comentario:
+      "A longitudinalidade é o atributo que garante o vínculo e o acompanhamento contínuo entre equipe de saúde e paciente ao longo do tempo — um dos pilares da Estratégia Saúde da Família.",
+    dificuldade: 2,
+    tags: ["APS", "SUS"],
+  },
 ];
 
 function buildAlternatives(texts: string[]): QuestionAlternative[] {
@@ -172,6 +203,7 @@ export const DEMO_QUESTIONS: Question[] = SEEDS.map((seed, idx) => {
     subjectSlug: subject.slug,
     subjectName: subject.name,
     tema: seed.tema,
+    subtema: seed.subtema,
     banca: seed.banca,
     ano: seed.ano,
     enunciado: seed.enunciado,

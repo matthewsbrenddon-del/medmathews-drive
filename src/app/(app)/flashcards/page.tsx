@@ -18,9 +18,11 @@ export default function FlashcardsPage() {
   const generateFromQuestions = useFlashcardStore((s) => s.generateFromQuestions);
   const progressMap = useFlashcardProgressStore((s) => s.progress);
 
-  const questions = useQuestionStore((s) => s.questions);
+  const allQuestions = useQuestionStore((s) => s.questions);
   const questionProgress = useQuestionProgressStore((s) => s.progress);
-  const subjects = useMemo(() => getSubjectsFromItems(questions), [questions]);
+  const subjects = useMemo(() => getSubjectsFromItems(allQuestions), [allQuestions]);
+  // Questões anuladas (sem gabarito único) não viram flashcard — não há resposta correta para testar.
+  const questions = useMemo(() => allQuestions.filter((q) => !q.anulada), [allQuestions]);
 
   const [showNewDeck, setShowNewDeck] = useState(false);
   const [deckName, setDeckName] = useState("");

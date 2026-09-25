@@ -50,7 +50,11 @@ export function QuestionCard({ question, onClick }: { question: Question; onClic
 
       <div className="flex items-center justify-between mt-auto pt-1">
         <PriorityBadge priority={question.dificuldade} />
-        <StatusBadge status={progress.status} kind="question" />
+        {question.anulada ? (
+          <span className="rounded-full bg-warning/10 text-warning text-xs font-medium px-2 py-0.5">Anulada</span>
+        ) : (
+          <StatusBadge status={progress.status} kind="question" />
+        )}
       </div>
     </div>
   );

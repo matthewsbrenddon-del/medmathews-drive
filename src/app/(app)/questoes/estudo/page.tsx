@@ -107,8 +107,13 @@ function EstudoContent() {
 
   function handleSubmit() {
     if (!selected) return;
-    const correct = answerQuestion(question.id, selected, question.gabarito);
     setSubmitted(true);
+    if (question.anulada) {
+      // Sem gabarito único — não pontua nem entra nas estatísticas de acerto.
+      recordStudyToday();
+      return;
+    }
+    const correct = answerQuestion(question.id, selected, question.gabarito);
     setSession((s) => ({ correct: s.correct + (correct ? 1 : 0), answered: s.answered + 1 }));
     recordStudyToday();
   }
@@ -151,11 +156,16 @@ function EstudoContent() {
             Esta questão faz referência a uma imagem (ver planilha original).
           </p>
         )}
+        {question.anulada && (
+          <p className="mt-2 text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
+            Questão anulada oficialmente pela banca — sem gabarito único divulgado. Não conta para suas estatísticas.
+          </p>
+        )}
 
         <div className="flex flex-col gap-2 mt-5">
           {question.alternatives.map((alt) => {
             const isSelected = selected === alt.letter;
-            const isCorrect = alt.letter === question.gabarito;
+            const isCorrect = !question.anulada && alt.letter === question.gabarito;
             let style = "border-border hover:bg-surface-hover";
             if (submitted) {
               if (isCorrect) style = "border-success bg-success/10";
@@ -163,6 +173,7 @@ function EstudoContent() {
             } else if (isSelected) {
               style = "border-primary bg-primary-light";
             }
+            if (submitted && question.anulada && isSelected) style = "border-primary bg-primary-light";
             return (
               <button
                 key={alt.letter}
@@ -177,7 +188,7 @@ function EstudoContent() {
                 <span className="font-semibold shrink-0">{alt.letter})</span>
                 <span className="flex-1">{alt.text}</span>
                 {submitted && isCorrect && <Check size={16} className="text-success shrink-0" />}
-                {submitted && isSelected && !isCorrect && <X size={16} className="text-danger shrink-0" />}
+                {submitted && isSelected && !isCorrect && !question.anulada && <X size={16} className="text-danger shrink-0" />}
               </button>
             );
           })}

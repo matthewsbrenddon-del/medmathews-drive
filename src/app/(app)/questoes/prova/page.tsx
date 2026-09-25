@@ -51,8 +51,10 @@ function ProvaContent() {
     status: searchParams.get("status") ?? undefined,
   };
 
+  // Questões anuladas (sem gabarito único) ficam de fora do Modo Prova — não há
+  // como pontuá-las com segurança num bloco cronometrado/avaliado.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const available = useMemo(() => filterQuestions(questions, filters, progressMap), [questions]);
+  const available = useMemo(() => filterQuestions(questions, filters, progressMap).filter((q) => !q.anulada), [questions]);
 
   const [stage, setStage] = useState<Stage>("setup");
   const [quantidade, setQuantidade] = useState(Math.min(10, available.length || 1));

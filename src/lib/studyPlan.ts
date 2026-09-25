@@ -90,7 +90,7 @@ export function buildStudyPlan(params: {
   // na revisão), agrupados por disciplina.
   const pendingBySubject = new Map<string, { subjectName: string; reviewing: number; fresh: number }>();
   for (const q of questions) {
-    if (!subjectSet.has(q.subjectSlug)) continue;
+    if (!subjectSet.has(q.subjectSlug) || q.anulada) continue;
     const progress = questionProgress[q.id];
     const isPending = !progress || progress.status === "nao_respondida" || needsReview(progress);
     if (!isPending) continue;

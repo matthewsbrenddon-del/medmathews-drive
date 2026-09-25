@@ -92,7 +92,7 @@ export const useFlashcardStore = create<FlashcardStoreState>()(
 
       generateFromQuestions: (deckId, questions) => {
         const existingSourceIds = new Set(get().cards.map((c) => c.sourceQuestionId).filter(Boolean));
-        const toCreate = questions.filter((q) => !existingSourceIds.has(q.id));
+        const toCreate = questions.filter((q) => !q.anulada && !existingSourceIds.has(q.id));
         const newCards: Flashcard[] = toCreate.map((q) => {
           const correct = q.alternatives.find((a) => a.letter === q.gabarito);
           const back = [

@@ -95,6 +95,10 @@ export interface Question {
   tags: string[];
   observacoes?: string;
   hasImage?: boolean;
+  /** true quando a questão foi oficialmente anulada pela banca (sem gabarito único) —
+   * `gabarito` fica vazio nesse caso. Continua visível para leitura, mas não é
+   * pontuada em Modo Estudo/Prova nem entra nas estatísticas de desempenho. */
+  anulada?: boolean;
 }
 
 /** Estado do usuário para uma questão — histórico usado na revisão espaçada simples. */

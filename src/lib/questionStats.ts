@@ -32,6 +32,7 @@ export function computeQuestionStats(
   let totalCorrect = 0;
 
   for (const question of questions) {
+    if (question.anulada) continue; // sem gabarito único — não entra nas estatísticas de acerto
     const subject = resolveSubject(question.subjectName);
     const entry =
       bySubjectMap.get(subject.slug) ??
@@ -90,7 +91,7 @@ export function getRecommendedTemas(
   const byTema = new Map<string, TemaRecommendation>();
 
   for (const question of questions) {
-    if (!question.tema) continue;
+    if (!question.tema || question.anulada) continue;
     const progress = progressMap[question.id];
     if (!progress || progress.history.length === 0) continue;
 

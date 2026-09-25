@@ -24,15 +24,32 @@ export function buildAnkiExport(cards: Flashcard[]): string {
   return header + rows.join("\n");
 }
 
-export function downloadAnkiExport(cards: Flashcard[], fileName: string) {
-  const content = buildAnkiExport(cards);
-  const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+function downloadBlob(content: string, mimeType: string, fileName: string) {
+  const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = fileName.endsWith(".txt") ? fileName : `${fileName}.txt`;
+  link.download = fileName;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+}
+
+export function downloadAnkiExport(cards: Flashcard[], fileName: string) {
+  downloadBlob(buildAnkiExport(cards), "text/plain;charset=utf-8", fileName.endsWith(".txt") ? fileName : `${fileName}.txt`);
+}
+
+function escapeCsvField(text: string): string {
+  return `"${text.replace(/"/g, '""').replace(/\r?\n/g, " ")}"`;
+}
+
+export function buildCsvExport(cards: Flashcard[]): string {
+  const header = "Frente,Verso,Tags\n";
+  const rows = cards.map((c) => [escapeCsvField(c.front), escapeCsvField(c.back), escapeCsvField(c.tags.join(" "))].join(","));
+  return header + rows.join("\n");
+}
+
+export function downloadCsvExport(cards: Flashcard[], fileName: string) {
+  downloadBlob(buildCsvExport(cards), "text/csv;charset=utf-8", fileName.endsWith(".csv") ? fileName : `${fileName}.csv`);
 }

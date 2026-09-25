@@ -16,17 +16,23 @@ interface QuestionStoreState {
   questions: Question[];
   hasImported: boolean;
   lastImport?: ImportSummary;
+  /** true depois que o banco de questões real (seed-data/questions-qbank.json) foi buscado com sucesso. */
+  seedHydrated: boolean;
 
   importQuestions: (newQuestions: Question[], summary: ImportSummary) => void;
   resetToDemo: () => void;
+  /** Busca o banco de questões real (400 questões Revalida/INEP) uma vez, no cliente.
+   * Só substitui os exemplos didáticos — nunca sobrescreve uma planilha que o usuário já importou. */
+  hydrateSeed: () => Promise<void>;
 }
 
 export const useQuestionStore = create<QuestionStoreState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       questions: DEMO_QUESTIONS,
       hasImported: false,
       lastImport: undefined,
+      seedHydrated: false,
 
       importQuestions: (newQuestions, summary) =>
         set((s) => {
@@ -38,8 +44,21 @@ export const useQuestionStore = create<QuestionStoreState>()(
           return { questions: Array.from(byId.values()), hasImported: true, lastImport: summary };
         }),
 
-      resetToDemo: () => set({ questions: DEMO_QUESTIONS, hasImported: false, lastImport: undefined }),
+      resetToDemo: () => set({ questions: DEMO_QUESTIONS, hasImported: false, lastImport: undefined, seedHydrated: false }),
+
+      hydrateSeed: async () => {
+        if (get().seedHydrated || get().hasImported) return;
+        try {
+          const res = await fetch("/seed-data/questions-qbank.json");
+          if (!res.ok) return;
+          const seedQuestions: Question[] = await res.json();
+          if (get().seedHydrated || get().hasImported) return;
+          set({ questions: seedQuestions, seedHydrated: true });
+        } catch {
+          // Sem rede ou arquivo indisponível — mantém os exemplos didáticos, sem quebrar a UI.
+        }
+      },
     }),
-    { name: "medstudy-hub-questions" }
+    { name: "medstudy-hub-questions", partialize: (s) => ({ questions: s.questions, hasImported: s.hasImported, lastImport: s.lastImport, seedHydrated: s.seedHydrated }) }
   )
 );

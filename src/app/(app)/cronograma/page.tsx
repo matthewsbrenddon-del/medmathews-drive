@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, Calendar, Check, Clock, PartyPopper, RotateCcw, Settings2 } from "lucide-react";
+import { AlertTriangle, Calendar, Check, Clock, Loader2, PartyPopper, RotateCcw, Settings2, Sparkles } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { PriorityBadge } from "@/components/PriorityBadge";
 import { useContent } from "@/lib/content";
@@ -11,6 +11,7 @@ import { useQuestionStore } from "@/lib/questionStore";
 import { useQuestionProgressStore } from "@/lib/questionProgressStore";
 import { useScheduleStore } from "@/lib/scheduleStore";
 import { getSubjectsFromContentAndQuestions } from "@/lib/subjects";
+import { getRecommendedTemas } from "@/lib/questionStats";
 import { buildStudyPlan, type PlanItem } from "@/lib/studyPlan";
 import { formatDayLabel, todayIso } from "@/lib/dateUtil";
 import { cn } from "@/lib/utils";
@@ -106,7 +107,7 @@ function SetupForm() {
   );
 }
 
-function ItemRow({ item }: { item: PlanItem }) {
+function ItemRow({ item, justificativa }: { item: PlanItem; justificativa?: string }) {
   const setWatchStatus = useStudyStore((s) => s.setWatchStatus);
   const setReadStatus = useStudyStore((s) => s.setReadStatus);
   const postponeItem = useScheduleStore((s) => s.postponeItem);
@@ -136,6 +137,11 @@ function ItemRow({ item }: { item: PlanItem }) {
           </span>
           <PriorityBadge priority={item.priority} />
         </div>
+        {justificativa && (
+          <p className="mt-1 text-xs text-accent inline-flex items-center gap-1">
+            <Sparkles size={11} className="shrink-0" /> {justificativa}
+          </p>
+        )}
       </div>
       <Link href={href} className="btn-outline btn-sm shrink-0">
         Abrir
@@ -156,6 +162,11 @@ function ItemRow({ item }: { item: PlanItem }) {
       </button>
     </div>
   );
+}
+
+interface AiPlannedDay {
+  date: string;
+  items: { item: PlanItem; justificativa?: string }[];
 }
 
 function PlanView() {
@@ -185,6 +196,65 @@ function PlanView() {
   const daysWithItems = plan.days.filter((d) => d.items.length > 0);
   const isAllDone = plan.totalPendingMinutes === 0;
 
+  const [aiPlan, setAiPlan] = useState<AiPlannedDay[] | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  async function handleRecalcularComIA() {
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      const allItems = [...plan.days.flatMap((d) => d.items), ...plan.overflow];
+      const itemByKey = new Map(allItems.map((i) => [i.key, i]));
+      const temas = getRecommendedTemas(questions, questionProgress, 20);
+
+      const res = await fetch("/api/ai/cronograma", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          itensPendentes: allItems.map((i) => ({
+            key: i.key,
+            title: i.title,
+            subjectName: i.subjectName,
+            estimatedMinutes: i.estimatedMinutes,
+            priority: i.priority,
+          })),
+          desempenhoPorTema: temas.map((t) => ({ tema: t.tema, subjectName: t.subjectName, accuracyPercent: t.accuracyPercent })),
+          dataAlvo: config.targetDate,
+          disponibilidadeDiaria: config.dailyMinutes,
+          itensConcluidos: Math.max(0, content.filter((c) => config.selectedSubjects.includes(c.subjectSlug)).length - allItems.length),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAiError(data.error ?? "Não foi possível recalcular com IA agora.");
+        return;
+      }
+
+      const dias: { data: string; itens: { key: string; titulo: string; duracaoMin: number; justificativa?: string }[] }[] = data.dias;
+      const mapped: AiPlannedDay[] = dias
+        .map((d) => {
+          const items: { item: PlanItem; justificativa?: string }[] = [];
+          for (const it of d.itens) {
+            const item = itemByKey.get(it.key);
+            if (item) items.push({ item, justificativa: it.justificativa });
+          }
+          return { date: d.data, items };
+        })
+        .filter((d) => d.items.length > 0);
+
+      if (mapped.length === 0) {
+        setAiError("A IA retornou um plano, mas nenhum item pôde ser associado ao cronograma atual. Tente novamente.");
+        return;
+      }
+      setAiPlan(mapped);
+    } catch {
+      setAiError("Não foi possível conectar à IA agora. O cronograma padrão continua disponível.");
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -195,10 +265,24 @@ function PlanView() {
             min/dia · {config.selectedSubjects.length} disciplinas
           </p>
         </div>
-        <button type="button" className="btn-outline" onClick={deactivate}>
-          <Settings2 size={15} /> Reconfigurar
-        </button>
+        <div className="flex items-center gap-2">
+          {aiPlan ? (
+            <button type="button" className="btn-outline" onClick={() => setAiPlan(null)}>
+              Voltar ao cronograma padrão
+            </button>
+          ) : (
+            <button type="button" className="btn-outline" onClick={handleRecalcularComIA} disabled={aiLoading || isAllDone}>
+              {aiLoading ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
+              {aiLoading ? "Recalculando..." : "Recalcular com IA"}
+            </button>
+          )}
+          <button type="button" className="btn-outline" onClick={deactivate}>
+            <Settings2 size={15} /> Reconfigurar
+          </button>
+        </div>
       </div>
+
+      {aiError && <p className="text-sm text-danger">{aiError}</p>}
 
       {isAllDone ? (
         <EmptyState
@@ -206,6 +290,22 @@ function PlanView() {
           title="Tudo em dia!"
           description="Você concluiu todo o conteúdo e questões pendentes das disciplinas selecionadas para este cronograma."
         />
+      ) : aiPlan ? (
+        <div className="flex flex-col gap-4">
+          <p className="text-xs text-muted-foreground inline-flex items-center gap-1">
+            <Sparkles size={12} /> Plano reorganizado pela IA — ajustes manuais (marcar feito, adiar) não exigem nova chamada.
+          </p>
+          {aiPlan.map((day) => (
+            <div key={day.date} className="card p-5">
+              <h2 className="font-semibold text-foreground mb-2">{formatDayLabel(day.date)}</h2>
+              <div>
+                {day.items.map(({ item, justificativa }) => (
+                  <ItemRow key={item.key} item={item} justificativa={justificativa} />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       ) : (
         <>
           {plan.overflow.length > 0 && (

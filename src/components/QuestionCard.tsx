@@ -13,10 +13,17 @@ export function QuestionCard({ question, onClick }: { question: Question; onClic
   const subject = resolveSubject(question.subjectName);
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
-      className="card p-4 flex flex-col gap-3 text-left hover:shadow-lift hover:-translate-y-0.5 transition-all duration-200 w-full"
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick?.();
+        }
+      }}
+      className="card p-4 flex flex-col gap-3 text-left hover:shadow-lift hover:-translate-y-0.5 transition-all duration-200 w-full cursor-pointer"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 flex-wrap">
@@ -45,6 +52,6 @@ export function QuestionCard({ question, onClick }: { question: Question; onClic
         <PriorityBadge priority={question.dificuldade} />
         <StatusBadge status={progress.status} kind="question" />
       </div>
-    </button>
+    </div>
   );
 }

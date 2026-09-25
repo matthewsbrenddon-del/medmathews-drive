@@ -3,17 +3,20 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useStudyStore } from "@/lib/store";
+import { useQuestionStore } from "@/lib/questionStore";
 import { LoadingState } from "./LoadingState";
 
 /** Garante que apenas usuários que concluíram o onboarding vejam o app principal. */
 export function OnboardingGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const onboarded = useStudyStore((s) => s.onboarded);
+  const hydrateSeed = useQuestionStore((s) => s.hydrateSeed);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     setHydrated(true);
-  }, []);
+    hydrateSeed();
+  }, [hydrateSeed]);
 
   useEffect(() => {
     if (hydrated && !onboarded) {

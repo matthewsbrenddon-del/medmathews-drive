@@ -366,14 +366,21 @@ function subjectNameFor(slug: string): string {
   return KNOWN_SUBJECTS.find((s) => s.slug === slug)?.name ?? slug;
 }
 
+// Aulas reais já compartilhadas pelo usuário (link público do Drive) — sobrepõem
+// o arquivo sintético gerado por `demoFile` para o seedKey correspondente.
+const REAL_DRIVE_FILES: Record<string, string> = {
+  "CIR2-video": "1399SKwZsn0dOXwOOA0bJedSNn8PIxIZB", // Trauma e Abdome Agudo — Cirurgia Geral
+};
+
 function demoFile(seedKey: string, kind: "videoaula" | "apostila") {
   const hash = seededHash(seedKey);
-  const fileId = `demo-${hash}`;
+  const realFileId = REAL_DRIVE_FILES[seedKey];
+  const fileId = realFileId ?? `demo-${hash}`;
   return {
     fileId,
     webViewUrl: driveViewUrl(fileId),
     embedUrl: drivePreviewUrl(fileId),
-    thumbnailUrl: kind === "videoaula" ? `https://picsum.photos/seed/${hash}/480/270` : undefined,
+    thumbnailUrl: kind === "videoaula" && !realFileId ? `https://picsum.photos/seed/${hash}/480/270` : undefined,
     durationSeconds: kind === "videoaula" ? 420 + (hash % 40) * 30 : undefined,
     priority: (hash % 5) + 1,
     extension: kind === "videoaula" ? "mp4" : "pdf",

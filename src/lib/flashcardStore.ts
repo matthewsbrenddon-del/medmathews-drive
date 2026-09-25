@@ -31,6 +31,12 @@ interface FlashcardStoreState {
 
   /** Gera cartões determinísticos a partir de questões (enunciado/resposta), evitando duplicar por questão de origem. */
   generateFromQuestions: (deckId: string, questions: Question[]) => number;
+
+  /** Grava em lote os cartões aprovados na tela de revisão de geração por IA (spec v2, seção 6.1). */
+  addGeneratedCards: (
+    deckId: string,
+    cards: { front: string; back: string; tags?: string[]; sourceQuestionId?: string }[]
+  ) => number;
 }
 
 function newId(prefix: string, seed: string) {
@@ -106,6 +112,22 @@ export const useFlashcardStore = create<FlashcardStoreState>()(
           };
         });
         if (newCards.length > 0) set((s) => ({ cards: [...s.cards, ...newCards] }));
+        return newCards.length;
+      },
+
+      addGeneratedCards: (deckId, cards) => {
+        if (cards.length === 0) return 0;
+        const newCards: Flashcard[] = cards.map((c) => ({
+          id: newId("card", c.front),
+          deckId,
+          front: c.front,
+          back: c.back,
+          tags: c.tags ?? [],
+          sourceQuestionId: c.sourceQuestionId,
+          createdBy: "ia",
+          createdAt: new Date().toISOString(),
+        }));
+        set((s) => ({ cards: [...s.cards, ...newCards] }));
         return newCards.length;
       },
     }),

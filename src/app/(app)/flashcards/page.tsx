@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Layers, Plus, Sparkles, Wand2 } from "lucide-react";
+import { Check, Layers, Loader2, Plus, Sparkles, Trash2, Wand2 } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { useFlashcardStore } from "@/lib/flashcardStore";
 import { useFlashcardProgressStore, getDueCards } from "@/lib/flashcardProgressStore";
 import { useQuestionStore } from "@/lib/questionStore";
 import { useQuestionProgressStore, needsReview } from "@/lib/questionProgressStore";
 import { getSubjectsFromItems, resolveSubject } from "@/lib/subjects";
+import type { Question } from "@/lib/types";
 
 export default function FlashcardsPage() {
   const decks = useFlashcardStore((s) => s.decks);
@@ -30,6 +31,8 @@ export default function FlashcardsPage() {
   const [genSource, setGenSource] = useState<"erradas" | "todas">("erradas");
   const [genDeckId, setGenDeckId] = useState<string>("");
   const [genResult, setGenResult] = useState<number | null>(null);
+
+  const [showAiGenerate, setShowAiGenerate] = useState(false);
 
   const wrongQuestions = questions.filter((q) => {
     const p = questionProgress[q.id];
@@ -109,13 +112,8 @@ export default function FlashcardsPage() {
           <button type="button" onClick={() => setShowGenerate((v) => !v)} className="btn-outline self-start">
             <Wand2 size={14} /> {showGenerate ? "Fechar" : "Configurar geração"}
           </button>
-          <button
-            type="button"
-            disabled
-            title="Geração por IA generativa requer um provedor de IA configurado — ainda não disponível nesta versão."
-            className="btn-outline self-start opacity-50 cursor-not-allowed"
-          >
-            <Sparkles size={14} /> Gerar com IA (em breve)
+          <button type="button" onClick={() => setShowAiGenerate((v) => !v)} className="btn-outline self-start">
+            <Sparkles size={14} /> {showAiGenerate ? "Fechar" : "Gerar com IA"}
           </button>
         </div>
 
@@ -151,6 +149,15 @@ export default function FlashcardsPage() {
             )}
             {decks.length === 0 && <p className="text-xs text-muted-foreground">Crie um deck primeiro para poder gerar cartões nele.</p>}
           </div>
+        )}
+
+        {showAiGenerate && (
+          <AiGeneratePanel
+            questions={questions}
+            wrongQuestions={wrongQuestions}
+            subjects={subjects}
+            decks={decks}
+          />
         )}
       </section>
 
@@ -195,6 +202,222 @@ export default function FlashcardsPage() {
               </Link>
             );
           })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface ReviewCard {
+  tempId: string;
+  frente: string;
+  verso: string;
+  tema: string;
+  sourceQuestionId?: string;
+  approved: boolean;
+}
+
+const AI_MAX_SOURCE_QUESTIONS = 15;
+
+function AiGeneratePanel({
+  questions,
+  wrongQuestions,
+  subjects,
+  decks,
+}: {
+  questions: Question[];
+  wrongQuestions: Question[];
+  subjects: ReturnType<typeof getSubjectsFromItems>;
+  decks: ReturnType<typeof useFlashcardStore.getState>["decks"];
+}) {
+  const addGeneratedCards = useFlashcardStore((s) => s.addGeneratedCards);
+
+  const [source, setSource] = useState<"erradas" | "todas">("erradas");
+  const [subjectSlug, setSubjectSlug] = useState("todas");
+  const [deckId, setDeckId] = useState("");
+  const [quantidade, setQuantidade] = useState(15);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [reviewCards, setReviewCards] = useState<ReviewCard[] | null>(null);
+  const [saved, setSaved] = useState<number | null>(null);
+
+  const pool = source === "erradas" ? wrongQuestions : questions;
+  const filtered = subjectSlug === "todas" ? pool : pool.filter((q) => q.subjectSlug === subjectSlug);
+  const sourceQuestions = filtered.slice(0, AI_MAX_SOURCE_QUESTIONS);
+
+  async function handleGenerate() {
+    if (sourceQuestions.length === 0) return;
+    setLoading(true);
+    setError(null);
+    setReviewCards(null);
+    setSaved(null);
+    try {
+      const res = await fetch("/api/ai/flashcards", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          quantidade,
+          questions: sourceQuestions.map((q) => ({
+            id: q.id,
+            subjectName: q.subjectName,
+            tema: q.tema,
+            enunciado: q.enunciado,
+            alternatives: q.alternatives,
+            gabarito: q.gabarito,
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Não foi possível gerar os flashcards agora.");
+        return;
+      }
+      setReviewCards(
+        (data.cards as { questionId: string; frente: string; verso: string; tema: string }[]).map((c, i) => ({
+          tempId: `${c.questionId}-${i}`,
+          frente: c.frente,
+          verso: c.verso,
+          tema: c.tema,
+          sourceQuestionId: c.questionId || undefined,
+          approved: true,
+        }))
+      );
+    } catch {
+      setError("Não foi possível conectar à IA agora. Verifique sua conexão e tente novamente.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function updateReviewCard(tempId: string, patch: Partial<ReviewCard>) {
+    setReviewCards((cur) => cur?.map((c) => (c.tempId === tempId ? { ...c, ...patch } : c)) ?? cur);
+  }
+
+  function handleSaveApproved() {
+    if (!reviewCards || !deckId) return;
+    const approved = reviewCards.filter((c) => c.approved && c.frente.trim() && c.verso.trim());
+    const created = addGeneratedCards(
+      deckId,
+      approved.map((c) => ({ front: c.frente.trim(), back: c.verso.trim(), tags: c.tema ? [c.tema] : [], sourceQuestionId: c.sourceQuestionId }))
+    );
+    setSaved(created);
+    setReviewCards(null);
+  }
+
+  return (
+    <div className="flex flex-col gap-3 animate-fade-in border-t border-border/60 pt-4">
+      <p className="text-xs text-muted-foreground">
+        A IA lê os casos clínicos selecionados do banco de questões (não temos acesso ao texto de aulas/apostilas do Drive)
+        e escreve cartões de recuperação ativa. Revise, edite ou descarte antes de salvar.
+      </p>
+
+      {!reviewCards && (
+        <div className="flex flex-wrap gap-2.5 items-center">
+          <select value={source} onChange={(e) => setSource(e.target.value as "erradas" | "todas")} className="input w-auto">
+            <option value="erradas">Só questões que já errei ({wrongQuestions.length})</option>
+            <option value="todas">Todas as questões do banco ({questions.length})</option>
+          </select>
+          <select value={subjectSlug} onChange={(e) => setSubjectSlug(e.target.value)} className="input w-auto">
+            <option value="todas">Todas as disciplinas</option>
+            {subjects.map((s) => (
+              <option key={s.slug} value={s.slug}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+          <input
+            type="number"
+            min={1}
+            max={40}
+            value={quantidade}
+            onChange={(e) => setQuantidade(Number(e.target.value) || 15)}
+            className="input w-24"
+            aria-label="Quantidade de cartões"
+          />
+          <button type="button" className="btn-primary" onClick={handleGenerate} disabled={loading || sourceQuestions.length === 0}>
+            {loading ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+            {loading ? "Gerando..." : "Gerar cartões"}
+          </button>
+          {sourceQuestions.length === 0 && (
+            <p className="text-xs text-muted-foreground w-full">Nenhuma questão disponível com esses filtros.</p>
+          )}
+          {sourceQuestions.length > 0 && (
+            <p className="text-xs text-muted-foreground w-full">
+              Material de origem: {sourceQuestions.length} questão(ões){filtered.length > sourceQuestions.length ? ` (de ${filtered.length} — limitado a ${AI_MAX_SOURCE_QUESTIONS} por chamada)` : ""}.
+            </p>
+          )}
+        </div>
+      )}
+
+      {error && <p className="text-xs text-danger">{error}</p>}
+
+      {saved !== null && <p className="text-xs text-success">{saved} cartões aprovados salvos no deck.</p>}
+
+      {reviewCards && (
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-medium text-foreground">
+              {reviewCards.length} cartões gerados — revise antes de salvar ({reviewCards.filter((c) => c.approved).length} aprovados)
+            </p>
+            <select value={deckId} onChange={(e) => setDeckId(e.target.value)} className="input w-auto">
+              <option value="">Escolha o deck de destino...</option>
+              {decks.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-2 max-h-[420px] overflow-y-auto pr-1">
+            {reviewCards.map((c) => (
+              <div key={c.tempId} className={`card p-3 flex flex-col gap-2 ${c.approved ? "" : "opacity-50"}`}>
+                <textarea
+                  value={c.frente}
+                  onChange={(e) => updateReviewCard(c.tempId, { frente: e.target.value })}
+                  rows={2}
+                  className="input text-sm"
+                  placeholder="Frente (pergunta)"
+                />
+                <textarea
+                  value={c.verso}
+                  onChange={(e) => updateReviewCard(c.tempId, { verso: e.target.value })}
+                  rows={2}
+                  className="input text-sm"
+                  placeholder="Verso (resposta)"
+                />
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">{c.tema}</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => updateReviewCard(c.tempId, { approved: !c.approved })}
+                      className={`btn-sm ${c.approved ? "btn-primary" : "btn-outline"}`}
+                    >
+                      <Check size={13} /> {c.approved ? "Aprovado" : "Aprovar"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setReviewCards((cur) => cur?.filter((x) => x.tempId !== c.tempId) ?? cur)}
+                      aria-label="Descartar cartão"
+                      className="text-muted-foreground hover:text-danger"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button type="button" className="btn-primary self-start" onClick={handleSaveApproved} disabled={!deckId}>
+              Salvar aprovados
+            </button>
+            <button type="button" className="btn-outline self-start" onClick={() => setReviewCards(null)}>
+              Descartar tudo
+            </button>
+          </div>
         </div>
       )}
     </div>

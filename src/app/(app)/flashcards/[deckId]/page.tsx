@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Check, Download, Layers, Plus, RotateCw, Trash2, X } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
-import { downloadAnkiExport } from "@/lib/ankiExport";
+import { downloadAnkiExport, downloadCsvExport } from "@/lib/ankiExport";
 import { useFlashcardStore } from "@/lib/flashcardStore";
 import { useFlashcardProgressStore, getDueCards } from "@/lib/flashcardProgressStore";
 import { cn } from "@/lib/utils";
@@ -52,6 +52,14 @@ export default function DeckPage({ params }: { params: { deckId: string } }) {
             onClick={() => downloadAnkiExport(deckCards, deck.name)}
           >
             <Download size={14} /> Exportar para Anki
+          </button>
+          <button
+            type="button"
+            className="btn-outline btn-sm"
+            disabled={deckCards.length === 0}
+            onClick={() => downloadCsvExport(deckCards, deck.name)}
+          >
+            <Download size={14} /> Exportar .csv
           </button>
         </div>
       </div>

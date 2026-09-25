@@ -130,6 +130,8 @@ export interface Flashcard {
   tags: string[];
   /** Preenchido quando o card foi gerado automaticamente a partir de uma questão do banco. */
   sourceQuestionId?: string;
+  /** "ia" quando o cartão veio da geração automática (spec v2, seção 6.1) — ausente/"manual" nos demais casos. */
+  createdBy?: "manual" | "ia";
   createdAt: string;
 }
 

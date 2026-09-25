@@ -36,6 +36,15 @@ Veja `src/lib/importCourses.ts` e `src/lib/importQuestions.ts` para as regras de
 
 Em **Cronograma**, escolha as disciplinas a priorizar, uma data-alvo e quantos minutos por dia você tem disponíveis. O app distribui as aulas/materiais pendentes (respeitando a `Prioridade` da planilha e a duração de cada item) e blocos de questões pendentes/erradas entre os dias até a data-alvo. O plano é sempre recalculado a partir do progresso atual — nada fica "desatualizado": assim que você conclui algo, ele some do plano automaticamente. Dá para adiar qualquer item para o dia seguinte.
 
+## IA para flashcards e cronograma (opcional)
+
+Dois recursos adicionais — nunca substitutivos — usam a API da Claude quando `ANTHROPIC_API_KEY` está configurada (veja `.env.example`); sem a chave, ambos ficam indisponíveis com uma mensagem clara na interface e o resto da plataforma continua funcionando normalmente:
+
+- **Gerar flashcards com IA** (`/api/ai/flashcards`, modelo Claude Haiku): a partir de questões do banco selecionadas como material de origem (a plataforma não extrai texto de PDFs/vídeos do Drive — só temos o ID do arquivo e o link), a IA escreve cartões de recuperação ativa. Os cartões passam por uma tela de revisão (editar/descartar/aprovar em lote) antes de serem salvos no deck.
+- **Recalcular com IA** (`/api/ai/cronograma`, modelo Claude Sonnet, em **Cronograma**): reorganiza os mesmos itens pendentes do algoritmo determinístico (`src/lib/studyPlan.ts`), levando em conta o desempenho por tema no banco de questões, e acrescenta uma justificativa curta para os itens de alta prioridade. Só roda quando o usuário clica no botão — nunca automaticamente, para controlar custo. O algoritmo determinístico continua sendo o padrão/fallback.
+
+A chave nunca é exposta no navegador — toda chamada à API da Claude acontece em `src/app/api/ai/*` (server-side), via `src/lib/ai/anthropicClient.ts`.
+
 ## Banco de dados / produção
 
 Esta versão de demonstração roda inteiramente no navegador (localStorage), então **nenhuma variável de ambiente é necessária** para publicar em um serviço como o Vercel. Se quiser persistir em um banco real:

@@ -7,7 +7,7 @@ import { SubjectIcon } from "./SubjectIcon";
 export function SubjectCard({ subject }: { subject: SubjectProgress }) {
   return (
     <Link
-      href={`/disciplinas/${subject.slug}`}
+      href={`/disciplinas?area=${subject.slug}`}
       className="card p-5 flex flex-col gap-4 hover:shadow-lift hover:-translate-y-0.5 transition-all duration-200 group"
     >
       <div className="flex items-center justify-between">

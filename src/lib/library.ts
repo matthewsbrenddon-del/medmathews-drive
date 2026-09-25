@@ -10,8 +10,11 @@
 // nunca redireciona para fora da plataforma como primeira ação.
 // ============================================================================
 
-import type { LibraryFile } from "./types";
+import type { ContentProgress, LibraryFile } from "./types";
+import type { ClassifiedFile } from "./classification";
+import type { SubjectProgress } from "./progress";
 import { drivePreviewUrl, driveViewUrl } from "./driveLink";
+import { KNOWN_SUBJECTS, resolveSubject } from "./subjects";
 import { normalizeText } from "./utils";
 
 export type LibraryFileKind = "video" | "pdf" | "image" | "audio" | "epub" | "outro";
@@ -115,6 +118,96 @@ export function listChildren(files: LibraryFile[], prefix: string[]): LibraryNod
   fileNodes.sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 
   return [...folderNodes, ...fileNodes];
+}
+
+export const UNCLASSIFIED_LABEL = "A classificar";
+
+/** Navegação em árvore pela classificação clínica (Grande Área → Disciplina
+ * → arquivo), em vez do caminho por curso/pastas de `listChildren`. Itens
+ * sem `subjectSlug` (não classificados) ficam agrupados sob "A classificar",
+ * um nível abaixo por curso de origem (para não virar uma lista única de
+ * milhares de itens). */
+export function listChildrenByGrandeArea(items: ClassifiedFile[], prefix: string[]): LibraryNode[] {
+  if (prefix.length === 0) {
+    const counts = new Map<string, number>();
+    for (const item of items) {
+      const key = item.subjectSlug ? resolveSubject(item.subjectSlug).name : UNCLASSIFIED_LABEL;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    const order = [...KNOWN_SUBJECTS.map((s) => s.name), UNCLASSIFIED_LABEL];
+    return order
+      .filter((name) => counts.has(name))
+      .map((name) => ({ type: "folder" as const, name, path: [name], fileCount: counts.get(name)! }));
+  }
+
+  const grandeAreaName = prefix[0];
+  const isUnclassifiedBucket = grandeAreaName === UNCLASSIFIED_LABEL;
+  const scoped = items.filter((item) =>
+    isUnclassifiedBucket ? !item.subjectSlug : item.subjectSlug && resolveSubject(item.subjectSlug).name === grandeAreaName
+  );
+  const groupOf = (item: ClassifiedFile) => (isUnclassifiedBucket ? item.curso : item.disciplina || "Outros");
+
+  if (prefix.length === 1) {
+    const counts = new Map<string, number>();
+    for (const item of scoped) counts.set(groupOf(item), (counts.get(groupOf(item)) ?? 0) + 1);
+    return Array.from(counts.entries())
+      .sort((a, b) => a[0].localeCompare(b[0], "pt-BR"))
+      .map(([name, fileCount]) => ({ type: "folder" as const, name, path: [...prefix, name], fileCount }));
+  }
+
+  const groupName = prefix[1];
+  return scoped
+    .filter((item) => groupOf(item) === groupName)
+    .map((item) => ({ type: "file" as const, name: fileName(item), path: [...prefix, fileName(item)], file: item, kind: fileKind(item) }))
+    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+}
+
+function isLibraryItemComplete(kind: LibraryFileKind, state?: ContentProgress): boolean {
+  if (!state) return false;
+  return kind === "video" ? state.watchStatus === "assistida" : state.readStatus === "estudado";
+}
+
+/** Mesma agregação de `src/lib/progress.ts#computeSubjectProgress`, mas a
+ * partir do acervo real classificado em vez do StudyContent[] de exemplo —
+ * usa a MESMA store de progresso (chave = ID do arquivo do Drive), então o
+ * progresso é sempre o mesmo não importa por onde o item foi aberto. */
+export function computeSubjectProgressFromLibrary(
+  items: ClassifiedFile[],
+  userStates: Record<string, ContentProgress>
+): SubjectProgress[] {
+  const bySubject = new Map<string, ClassifiedFile[]>();
+  for (const item of items) {
+    if (!item.subjectSlug) continue;
+    const list = bySubject.get(item.subjectSlug) ?? [];
+    list.push(item);
+    bySubject.set(item.subjectSlug, list);
+  }
+
+  const result: SubjectProgress[] = [];
+  for (const [slug, subjectItems] of bySubject.entries()) {
+    const meta = resolveSubject(slug);
+    const lessons = subjectItems.filter((i) => fileKind(i) === "video");
+    const materials = subjectItems.filter((i) => fileKind(i) !== "video");
+    const watchedLessons = lessons.filter((i) => isLibraryItemComplete("video", userStates[i.id])).length;
+    const studiedMaterials = materials.filter((i) => isLibraryItemComplete("pdf", userStates[i.id])).length;
+    const totalItems = subjectItems.length;
+    const completedItems = watchedLessons + studiedMaterials;
+    result.push({
+      slug,
+      name: meta.name,
+      colorToken: meta.colorToken,
+      icon: meta.icon,
+      totalLessons: lessons.length,
+      watchedLessons,
+      totalMaterials: materials.length,
+      studiedMaterials,
+      totalItems,
+      completedItems,
+      percent: totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0,
+    });
+  }
+
+  return result.sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 }
 
 /** Busca por nome de arquivo/curso/área em todo o acervo (ignora pasta atual) —

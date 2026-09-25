@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { RefreshCcw, Info, Moon, Database } from "lucide-react";
+import { RefreshCcw, Info, Moon, Database, ClipboardList } from "lucide-react";
 import { ConfirmationModal } from "@/components/ConfirmationModal";
 import { ImportCoursesPanel } from "@/components/ImportCoursesPanel";
 import { ImportQuestionsPanel } from "@/components/ImportQuestionsPanel";
+import { ImportTaxonomyPanel } from "@/components/ImportTaxonomyPanel";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useContentStore } from "@/lib/contentStore";
 import { useQuestionStore } from "@/lib/questionStore";
+import { useClassificationStore } from "@/lib/classificationStore";
 import { formatRelativeDate } from "@/lib/utils";
 
 export default function ConfiguracoesPage() {
@@ -16,12 +18,20 @@ export default function ConfiguracoesPage() {
   const resetToDemo = useContentStore((s) => s.resetToDemo);
   const lastQuestionImport = useQuestionStore((s) => s.lastImport);
   const resetQuestions = useQuestionStore((s) => s.resetToDemo);
+  const classificationCount = useClassificationStore((s) => Object.keys(s.overrides).length);
+  const resetClassification = useClassificationStore((s) => s.resetAll);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmClassificationOpen, setConfirmClassificationOpen] = useState(false);
 
   function handleReset() {
     resetToDemo();
     resetQuestions();
     setConfirmOpen(false);
+  }
+
+  function handleResetClassification() {
+    resetClassification();
+    setConfirmClassificationOpen(false);
   }
 
   return (
@@ -60,6 +70,8 @@ export default function ConfiguracoesPage() {
       )}
 
       <ImportCoursesPanel />
+
+      <ImportTaxonomyPanel />
 
       <ImportQuestionsPanel />
 
@@ -108,6 +120,30 @@ export default function ConfiguracoesPage() {
         </button>
       </section>
 
+      {classificationCount > 0 && (
+        <section className="card p-5 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-foreground shrink-0">
+              <ClipboardList size={20} />
+            </div>
+            <div>
+              <p className="font-medium text-foreground">Limpar classificação por grande área</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Remove as {classificationCount} classificações manuais/importadas — os itens voltam a usar só a
+                sugestão automática (ou &quot;A classificar&quot;, quando não houver uma).
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setConfirmClassificationOpen(true)}
+            className="btn-outline text-danger border-danger/30 hover:bg-danger/5 shrink-0"
+          >
+            Limpar
+          </button>
+        </section>
+      )}
+
       <ConfirmationModal
         open={confirmOpen}
         title="Restaurar dados de exemplo?"
@@ -116,6 +152,16 @@ export default function ConfiguracoesPage() {
         danger
         onConfirm={handleReset}
         onCancel={() => setConfirmOpen(false)}
+      />
+
+      <ConfirmationModal
+        open={confirmClassificationOpen}
+        title="Limpar classificação por grande área?"
+        description="As classificações manuais e importadas por planilha serão removidas neste dispositivo. A classificação automática continua funcionando normalmente."
+        confirmLabel="Limpar"
+        danger
+        onConfirm={handleResetClassification}
+        onCancel={() => setConfirmClassificationOpen(false)}
       />
     </div>
   );

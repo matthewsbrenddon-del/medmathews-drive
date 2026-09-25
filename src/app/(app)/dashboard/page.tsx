@@ -1,14 +1,19 @@
 "use client";
 
+import { useEffect, useMemo } from "react";
 import Link from "next/link";
-import { ArrowRight, BookOpen, CheckCircle2, Clock, GraduationCap, TrendingUp, Video } from "lucide-react";
+import { ArrowRight, BookOpen, CheckCircle2, ClipboardList, Clock, GraduationCap, TrendingUp, Video } from "lucide-react";
 import { DashboardCard } from "@/components/DashboardCard";
 import { EmptyState } from "@/components/EmptyState";
 import { ProgressBar } from "@/components/ProgressBar";
 import { SubjectCard } from "@/components/SubjectCard";
 import { useContent } from "@/lib/content";
-import { computeOverallProgress, computeSubjectProgress, getContinueStudying } from "@/lib/progress";
+import { computeOverallProgress, getContinueStudying } from "@/lib/progress";
 import { useStudyStore } from "@/lib/store";
+import { useLibraryStore } from "@/lib/libraryStore";
+import { useClassificationStore } from "@/lib/classificationStore";
+import { classifyLibrary } from "@/lib/classification";
+import { computeSubjectProgressFromLibrary } from "@/lib/library";
 import { resolveSubject } from "@/lib/subjects";
 import { formatDuration } from "@/lib/utils";
 
@@ -16,8 +21,20 @@ export default function DashboardPage() {
   const content = useContent();
   const userStates = useStudyStore((s) => s.userStates);
 
+  const files = useLibraryStore((s) => s.files);
+  const libraryStatus = useLibraryStore((s) => s.status);
+  const hydrateLibrary = useLibraryStore((s) => s.hydrate);
+  const overrides = useClassificationStore((s) => s.overrides);
+
+  useEffect(() => {
+    hydrateLibrary();
+  }, [hydrateLibrary]);
+
+  const classified = useMemo(() => classifyLibrary(files, overrides), [files, overrides]);
+  const unclassifiedCount = useMemo(() => classified.filter((f) => !f.subjectSlug).length, [classified]);
+  const subjects = useMemo(() => computeSubjectProgressFromLibrary(classified, userStates), [classified, userStates]);
+
   const overall = computeOverallProgress(content, userStates);
-  const subjects = computeSubjectProgress(content, userStates);
   const continuing = getContinueStudying(content, userStates, 3);
 
   return (
@@ -107,11 +124,29 @@ export default function DashboardPage() {
             Ver todas <ArrowRight size={14} />
           </Link>
         </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {subjects.slice(0, 8).map((subject) => (
-            <SubjectCard key={subject.slug} subject={subject} />
-          ))}
-        </div>
+
+        {unclassifiedCount > 0 && (
+          <Link
+            href="/disciplinas/classificar"
+            className="rounded-xl border border-accent/30 bg-accent/5 px-4 py-3 flex items-center gap-3 hover:bg-accent/10 transition-colors mb-4"
+          >
+            <ClipboardList size={16} className="text-accent shrink-0" />
+            <p className="text-sm text-foreground flex-1">
+              <strong className="font-metric">{unclassifiedCount}</strong> itens aguardando classificação por grande área.
+            </p>
+            <ArrowRight size={14} className="text-accent shrink-0" />
+          </Link>
+        )}
+
+        {libraryStatus === "ready" && subjects.length === 0 ? (
+          <EmptyState icon={GraduationCap} title="Nenhuma disciplina classificada ainda." description="Assim que os itens do seu acervo forem classificados, eles aparecem aqui." />
+        ) : (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {subjects.slice(0, 8).map((subject) => (
+              <SubjectCard key={subject.slug} subject={subject} />
+            ))}
+          </div>
+        )}
       </section>
 
       {overall.percent > 0 && (

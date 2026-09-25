@@ -33,10 +33,12 @@ const SUBJECT_ALIASES: Record<string, string> = {
   "medicina interna": "clinica-medica",
   clinica: "clinica-medica",
   clm: "clinica-medica",
+  cm: "clinica-medica",
 
   cirurgia: "cirurgia-geral",
   "cirurgia geral": "cirurgia-geral",
   cir: "cirurgia-geral",
+  cx: "cirurgia-geral",
 
   ginecologia: "ginecologia-obstetricia",
   "ginecologia e obstetricia": "ginecologia-obstetricia",
@@ -49,6 +51,7 @@ const SUBJECT_ALIASES: Record<string, string> = {
 
   pediatria: "pediatria",
   pedia: "pediatria",
+  pedi: "pediatria",
   ped: "pediatria",
 
   "preventiva e mfc": "preventiva-mfc",
@@ -61,6 +64,36 @@ const SUBJECT_ALIASES: Record<string, string> = {
   mfc: "preventiva-mfc",
   prm: "preventiva-mfc",
   sus: "preventiva-mfc",
+
+  // --- Sub-especialidades (mapeadas para as 5 grandes áreas do ENAMED) ------
+  // Vistas nos cursinhos reais mapeados (MedCel, EstratégiaMED, MedCurso,
+  // Sanar) — usadas pela classificação automática da Biblioteca (seção
+  // "Por Grande Área"), nunca como disciplina nova: sempre resolvem para uma
+  // das 5 áreas conhecidas.
+  cardiologia: "clinica-medica",
+  dermatologia: "clinica-medica",
+  endocrinologia: "clinica-medica",
+  gastroenterologia: "clinica-medica",
+  gastrologia: "clinica-medica",
+  geriatria: "clinica-medica",
+  hematologia: "clinica-medica",
+  hepatologia: "clinica-medica",
+  infectologia: "clinica-medica",
+  "medicina intensiva": "clinica-medica",
+  nefrologia: "clinica-medica",
+  neurologia: "clinica-medica",
+  oftalmologia: "clinica-medica",
+  otorrinolaringologia: "cirurgia-geral",
+  pneumologia: "clinica-medica",
+  psiquiatria: "clinica-medica",
+  radiologia: "clinica-medica",
+  reumatologia: "clinica-medica",
+  urologia: "cirurgia-geral",
+  ortopedia: "cirurgia-geral",
+  "cirurgia pediatrica": "cirurgia-geral",
+  "cirurgia vascular": "cirurgia-geral",
+  "cirurgia do trauma": "cirurgia-geral",
+  "especialidades cirurgicas": "cirurgia-geral",
 };
 
 // Paleta usada para sintetizar cor/ícone de disciplinas fora do catálogo
@@ -75,6 +108,45 @@ const PALETTE: { colorToken: string; icon: string }[] = [
   { colorToken: "340 65% 50%", icon: "Syringe" },
   { colorToken: "48 80% 42%", icon: "Sun" },
 ];
+
+/** Remove sufixos de ruído comuns nos nomes de área dos cursinhos mapeados
+ * (ex.: "Cardiologia - Extensivo", "Nefrologia - Extensivo 9") antes de
+ * tentar casar com uma grande área conhecida. */
+export function stripSubjectNoise(text: string): string {
+  return text
+    .replace(/-?\s*extensivo\s*\d*$/i, "")
+    .replace(/-?\s*curso extensivo$/i, "")
+    .trim();
+}
+
+/** Tenta casar um texto livre (nome de área, segmento de pasta, nome de
+ * curso...) com uma das 5 grandes áreas conhecidas — ao contrário de
+ * `resolveSubject`, NUNCA sintetiza uma disciplina nova: retorna `undefined`
+ * quando não há correspondência confiável, para que o chamador possa tratar
+ * o item como "a classificar" em vez de forçar uma área errada. */
+export function matchKnownSubject(raw: string): Subject | undefined {
+  const trimmed = stripSubjectNoise(raw.trim());
+  if (!trimmed) return undefined;
+  const normalized = normalizeText(trimmed);
+
+  const exactAlias = SUBJECT_ALIASES[normalized];
+  if (exactAlias) return KNOWN_SUBJECTS.find((s) => s.slug === exactAlias);
+
+  const exactSlug = KNOWN_SUBJECTS.find((s) => s.slug === slugify(trimmed));
+  if (exactSlug) return exactSlug;
+
+  // Correspondência por substring — só para chaves com 4+ caracteres, para
+  // não deixar siglas curtas ("go", "cx"...) darem falso positivo dentro de
+  // outra palavra qualquer.
+  const bySubstring = Object.entries(SUBJECT_ALIASES)
+    .filter(([key]) => key.length >= 4)
+    .sort((a, b) => b[0].length - a[0].length);
+  for (const [key, slug] of bySubstring) {
+    if (normalized.includes(key)) return KNOWN_SUBJECTS.find((s) => s.slug === slug);
+  }
+
+  return undefined;
+}
 
 /** Resolve o nome de disciplina de uma linha da planilha para um Subject
  * consistente — reaproveitando o catálogo conhecido quando reconhece, ou

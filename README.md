@@ -36,14 +36,22 @@ Veja `src/lib/importCourses.ts` e `src/lib/importQuestions.ts` para as regras de
 
 Em **Cronograma**, escolha as disciplinas a priorizar, uma data-alvo e quantos minutos por dia você tem disponíveis. O app distribui as aulas/materiais pendentes (respeitando a `Prioridade` da planilha e a duração de cada item) e blocos de questões pendentes/erradas entre os dias até a data-alvo. O plano é sempre recalculado a partir do progresso atual — nada fica "desatualizado": assim que você conclui algo, ele some do plano automaticamente. Dá para adiar qualquer item para o dia seguinte.
 
-## Biblioteca Completa (acervo mapeado)
+## Disciplinas — uma biblioteca, duas navegações
 
-**Biblioteca Completa** é um navegador de pastas separado da grade curada de Disciplinas/Cronograma, para um acervo inteiro de materiais reais (cursinhos, e-books, bancos de questões em PDF) mapeado pelo usuário — hoje ~13,6 mil arquivos em `public/seed-data/library-mapeamento.json` (gerado a partir de `seed-data/MedStudyHub_Mapeamento_Materiais.xlsx`, colunas `Nome do curso, Área, Conteúdo, Link da aula/material`, com "Conteúdo" sendo o caminho de pastas até o arquivo separado por `›`).
+**Disciplinas** é a biblioteca completa do acervo real (cursinhos, e-books, bancos de questões em PDF — hoje ~13,6 mil arquivos em `public/seed-data/library-mapeamento.json`, gerado a partir de `seed-data/MedStudyHub_Mapeamento_Materiais.xlsx`), navegável de duas formas sobre o **mesmo** conteúdo — nunca duas listas separadas:
 
-- Não entra no `contentStore`/`studyPlan` (o algoritmo de cronograma continua operando só sobre a grade curada — não faria sentido agendar 13,6 mil itens automaticamente).
-- `src/lib/libraryStore.ts` busca o JSON uma única vez por sessão, sem persistir em `localStorage` (grande demais e é referência estática, não estado do usuário).
-- `src/lib/library.ts` computa a navegação em árvore (pastas/arquivos por nível) e a busca sob demanda a partir da lista plana — sem manter uma árvore aninhada em memória.
-- Cada arquivo abre em `FilePreviewModal`, com o preview do Drive embutido num iframe diretamente na página (`/file/d/{id}/preview`) — nunca redireciona para fora da plataforma; o botão "Abrir no Google Drive" é só um atalho opcional.
+- **Por Grande Área** (padrão): Grande Área ENAMED → Disciplina → arquivo, usando a classificação clínica (`src/lib/classification.ts`). Itens sem classificação confiável ficam agrupados em "A classificar" (por curso de origem), nunca escondidos.
+- **Por Curso**: exatamente a estrutura de pastas original de cada provedor (MedCel, EstratégiaMED, MedCurso, Sanar...) — cada um organiza diferente, e essa visão preserva esse contexto.
+
+Ambas abrem o mesmo `FilePreviewModal` (preview do Drive embutido num iframe, sem redirecionar para fora da plataforma) e escrevem no mesmo `useStudyStore` (favorito/assistido/estudado, chaveado pelo ID do arquivo do Drive) — abrir um item por qualquer uma das visões nunca duplica progresso.
+
+**Classificação dos itens:**
+- `src/lib/classification.ts#autoClassify` tenta inferir a grande área a partir do caminho original (área da planilha → subpastas → nome do curso) contra os aliases de `src/lib/subjects.ts#matchKnownSubject` — só classifica quando há correspondência confiável (nunca força uma área errada).
+- Itens sem correspondência ficam "a classificar": **Disciplinas → banner "N itens aguardando classificação" → /disciplinas/classificar**, onde dá para selecionar vários de uma vez e atribuir Grande Área/Disciplina em lote (com sugestão individual opcional baseada no nome do arquivo).
+- Ou em lote via planilha: **Configurações → Importar planilha de taxonomia** — `.xlsx` com colunas `ID do Arquivo (Drive)` (ou `Curso` + `Conteúdo`), `Grande Área`, `Disciplina`, `Subtema` (ver `seed-data/MedStudyHub_Taxonomia_Curso_Drive.xlsx`, quando disponível).
+- Classificações manuais/importadas ficam em `classificationStore` (localStorage, só os overrides — a sugestão automática nunca é persistida, é recalculada na hora).
+
+O acervo não entra no `contentStore`/`studyPlan`: o cronograma adaptativo continua operando só sobre a grade curada de exemplo — não faria sentido agendar 13,6 mil itens automaticamente. `src/lib/libraryStore.ts` busca o JSON uma única vez por sessão, sem persistir em `localStorage` (grande demais e é referência estática).
 
 ## IA para flashcards e cronograma (opcional)
 

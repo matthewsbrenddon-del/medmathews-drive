@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect } from "react";
-import { BookOpen, ExternalLink, File, FileText, Image as ImageIcon, Music, Video, X } from "lucide-react";
+import { BookOpen, Check, ExternalLink, File, FileText, Image as ImageIcon, Music, Undo2, Video, X } from "lucide-react";
 import type { LibraryFile } from "@/lib/types";
 import { fileEmbedUrl, fileKind, fileName, fileWebViewUrl, type LibraryFileKind } from "@/lib/library";
+import { FavoriteButton } from "./FavoriteButton";
+import { useStudyStore } from "@/lib/store";
 
 const KIND_ICON: Record<LibraryFileKind, typeof Video> = {
   video: Video,
@@ -24,6 +26,11 @@ const KIND_LABEL: Record<LibraryFileKind, string> = {
 };
 
 export function FilePreviewModal({ file, onClose }: { file: LibraryFile | null; onClose: () => void }) {
+  const userStates = useStudyStore((s) => s.userStates);
+  const setWatchStatus = useStudyStore((s) => s.setWatchStatus);
+  const setReadStatus = useStudyStore((s) => s.setReadStatus);
+  const recordStudyToday = useStudyStore((s) => s.recordStudyToday);
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -35,6 +42,16 @@ export function FilePreviewModal({ file, onClose }: { file: LibraryFile | null; 
   if (!file) return null;
 
   const kind = fileKind(file);
+  const isVideo = kind === "video";
+  const state = userStates[file.id];
+  const done = isVideo ? state?.watchStatus === "assistida" : state?.readStatus === "estudado";
+
+  function toggleDone() {
+    if (isVideo) setWatchStatus(file!.id, done ? "nao_iniciada" : "assistida");
+    else setReadStatus(file!.id, done ? "acessado" : "estudado");
+    if (!done) recordStudyToday();
+  }
+
   const Icon = KIND_ICON[kind];
   const name = fileName(file);
   const embedUrl = fileEmbedUrl(file);
@@ -78,7 +95,14 @@ export function FilePreviewModal({ file, onClose }: { file: LibraryFile | null; 
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2 p-4 border-t border-border/60">
+        <div className="flex items-center justify-between gap-2 p-4 border-t border-border/60">
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={toggleDone} className={done ? "btn-outline btn-sm" : "btn-primary btn-sm"}>
+              {done ? <Undo2 size={14} /> : <Check size={14} />}
+              {done ? "Desfazer conclusão" : isVideo ? "Marcar como assistida" : "Marcar como estudado"}
+            </button>
+            <FavoriteButton fileId={file.id} size="sm" />
+          </div>
           <a href={webViewUrl} target="_blank" rel="noreferrer" className="btn-outline btn-sm">
             <ExternalLink size={14} /> Abrir no Google Drive
           </a>

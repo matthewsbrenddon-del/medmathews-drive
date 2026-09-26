@@ -11,7 +11,6 @@ import {
   Clock,
   Inbox,
   Loader2,
-  PartyPopper,
   Plus,
   RotateCcw,
   Settings2,
@@ -19,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
+import { AllDoneIllustration } from "@/components/Illustrations";
 import { PriorityBadge } from "@/components/PriorityBadge";
 import { useContent } from "@/lib/content";
 import { useStudyStore } from "@/lib/store";
@@ -457,7 +457,7 @@ function PlanView() {
 
       {isAllDone ? (
         <EmptyState
-          icon={PartyPopper}
+          illustration={<AllDoneIllustration />}
           title="Tudo em dia!"
           description="Você concluiu todo o conteúdo e questões pendentes das disciplinas selecionadas para este cronograma."
         />

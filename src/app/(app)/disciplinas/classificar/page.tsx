@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Check, ClipboardList, PartyPopper, Sparkles } from "lucide-react";
+import { ArrowLeft, Check, ClipboardList, Sparkles } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
+import { AllDoneIllustration } from "@/components/Illustrations";
 import { LoadingState } from "@/components/LoadingState";
 import { useLibraryStore } from "@/lib/libraryStore";
 import { useClassificationStore, type ManualClassification } from "@/lib/classificationStore";
@@ -98,7 +99,7 @@ export default function ClassificarPage() {
       {status === "loading" || status === "idle" ? (
         <LoadingState label="Carregando o acervo completo..." />
       ) : unclassified.length === 0 ? (
-        <EmptyState icon={PartyPopper} title="Tudo classificado!" description="Não há itens aguardando classificação no momento." />
+        <EmptyState illustration={<AllDoneIllustration />} title="Tudo classificado!" description="Não há itens aguardando classificação no momento." />
       ) : (
         <>
           <div className="card p-4 flex flex-wrap items-center gap-2.5 sticky top-0 z-10 shadow-lift">

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Check, Layers, Loader2, Plus, Sparkles, Trash2, Wand2 } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
+import { StudyIllustration } from "@/components/Illustrations";
 import { useFlashcardStore } from "@/lib/flashcardStore";
 import { useFlashcardProgressStore, getDueCards } from "@/lib/flashcardProgressStore";
 import { useQuestionStore } from "@/lib/questionStore";
@@ -165,7 +166,7 @@ export default function FlashcardsPage() {
 
       {decks.length === 0 ? (
         <EmptyState
-          icon={Layers}
+          illustration={<StudyIllustration />}
           title="Nenhum deck ainda."
           description="Crie um deck manualmente ou gere um a partir das questões que você já errou."
         />

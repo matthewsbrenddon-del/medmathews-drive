@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { GraduationCap, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { ImportCoursesPanel } from "@/components/ImportCoursesPanel";
+import { Logo } from "@/components/Logo";
 import { useStudyStore } from "@/lib/store";
 
 export default function OnboardingPage() {
@@ -20,7 +21,7 @@ export default function OnboardingPage() {
     <div className="min-h-screen bg-background flex flex-col">
       <header className="flex items-center gap-2.5 px-6 sm:px-10 h-16">
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-          <GraduationCap size={20} />
+          <Logo size={19} />
         </div>
         <span className="font-semibold text-foreground">MedStudy Hub</span>
       </header>

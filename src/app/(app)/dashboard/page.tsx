@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo } from "react";
 import Link from "next/link";
-import { ArrowRight, BookOpen, CheckCircle2, ClipboardList, Clock, GraduationCap, TrendingUp, Video } from "lucide-react";
+import { ArrowRight, BookOpen, CheckCircle2, ClipboardList, Clock, TrendingUp, Video } from "lucide-react";
 import { DashboardCard } from "@/components/DashboardCard";
 import { EmptyState } from "@/components/EmptyState";
+import { EmptyBoxIllustration, StudyIllustration } from "@/components/Illustrations";
 import { ProgressBar } from "@/components/ProgressBar";
 import { SubjectCard } from "@/components/SubjectCard";
 import { useContent } from "@/lib/content";
@@ -79,7 +80,7 @@ export default function DashboardPage() {
 
         {continuing.length === 0 ? (
           <EmptyState
-            icon={GraduationCap}
+            illustration={<StudyIllustration />}
             title="Comece sua primeira aula para acompanhar seu progresso."
             description="Assim que você iniciar uma videoaula ou apostila, ela aparecerá aqui para você continuar de onde parou."
             action={
@@ -139,7 +140,11 @@ export default function DashboardPage() {
         )}
 
         {libraryStatus === "ready" && subjects.length === 0 ? (
-          <EmptyState icon={GraduationCap} title="Nenhuma disciplina classificada ainda." description="Assim que os itens do seu acervo forem classificados, eles aparecem aqui." />
+          <EmptyState
+            illustration={<EmptyBoxIllustration />}
+            title="Nenhuma disciplina classificada ainda."
+            description="Assim que os itens do seu acervo forem classificados, eles aparecem aqui."
+          />
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {subjects.slice(0, 8).map((subject) => (

@@ -2,8 +2,9 @@
 
 import { Suspense, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Brain, ClipboardList, RotateCcw, Search as SearchIcon, Sparkles, Tag } from "lucide-react";
+import { Brain, ClipboardList, Filter, RotateCcw, Search as SearchIcon, Sparkles, Tag } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
+import { EmptySearchIllustration } from "@/components/Illustrations";
 import { LoadingState } from "@/components/LoadingState";
 import { QuestionCard } from "@/components/QuestionCard";
 import { useQuestionStore } from "@/lib/questionStore";
@@ -29,14 +30,21 @@ function QuestoesContent() {
   const progressMap = useQuestionProgressStore((s) => s.progress);
 
   const [query, setQuery] = useState(searchParams.get("q") ?? "");
+  // Mecânica de filtro em painel (inspirada no QConcursos): os campos ficam
+  // num rascunho local e só valem depois de "Filtrar" — "Limpar" zera os
+  // dois de uma vez. A busca por texto abaixo do painel continua instantânea.
+  const [draftFilters, setDraftFilters] = useState<QuestionFilters>({});
   const [filters, setFilters] = useState<QuestionFilters>({});
 
   const subjects = useMemo(() => getSubjectsFromItems(questions), [questions]);
   const bancas = useMemo(() => getDistinctBancas(questions), [questions]);
   const anos = useMemo(() => getDistinctYears(questions), [questions]);
-  const temas = useMemo(() => getDistinctTemas(questions, filters.disciplina), [questions, filters.disciplina]);
-  const subtemas = useMemo(() => getDistinctSubtemas(questions, filters.tema), [questions, filters.tema]);
+  const temas = useMemo(() => getDistinctTemas(questions, draftFilters.disciplina), [questions, draftFilters.disciplina]);
+  const subtemas = useMemo(() => getDistinctSubtemas(questions, draftFilters.tema), [questions, draftFilters.tema]);
   const allTags = useMemo(() => getDistinctTags(questions), [questions]);
+
+  const hasAppliedFilters = Object.values(filters).some((v) => (Array.isArray(v) ? v.length > 0 : Boolean(v)));
+  const hasDraftChanges = JSON.stringify(draftFilters) !== JSON.stringify(filters);
 
   const recommendations = useMemo(() => getRecommendedTemas(questions, progressMap), [questions, progressMap]);
 
@@ -51,11 +59,20 @@ function QuestoesContent() {
   );
 
   function toggleTag(tag: string) {
-    setFilters((f) => {
+    setDraftFilters((f) => {
       const current = f.tags ?? [];
       const next = current.includes(tag) ? current.filter((t) => t !== tag) : [...current, tag];
       return { ...f, tags: next };
     });
+  }
+
+  function applyFilters() {
+    setFilters(draftFilters);
+  }
+
+  function clearFilters() {
+    setDraftFilters({});
+    setFilters({});
   }
 
   function buildQuery(extra?: Record<string, string>) {
@@ -114,14 +131,16 @@ function QuestoesContent() {
       )}
 
       <section className="card p-5 flex flex-col gap-4">
-        <h2 className="text-sm font-semibold text-foreground">Monte sua sessão personalizada</h2>
+        <h2 className="text-sm font-semibold text-foreground inline-flex items-center gap-1.5">
+          <Filter size={14} className="text-muted-foreground" /> Monte sua sessão personalizada
+        </h2>
 
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           <select
             aria-label="Filtrar por disciplina"
-            className="input w-auto py-2 text-sm"
-            value={filters.disciplina ?? "todas"}
-            onChange={(e) => setFilters((f) => ({ ...f, disciplina: e.target.value, tema: undefined, subtema: undefined }))}
+            className="input text-sm"
+            value={draftFilters.disciplina ?? "todas"}
+            onChange={(e) => setDraftFilters((f) => ({ ...f, disciplina: e.target.value, tema: undefined, subtema: undefined }))}
           >
             <option value="todas">Todas as disciplinas</option>
             {subjects.map((s) => (
@@ -131,75 +150,71 @@ function QuestoesContent() {
             ))}
           </select>
 
-          {temas.length > 0 && (
-            <select
-              aria-label="Filtrar por tema"
-              className="input w-auto py-2 text-sm"
-              value={filters.tema ?? "todos"}
-              onChange={(e) => setFilters((f) => ({ ...f, tema: e.target.value, subtema: undefined }))}
-            >
-              <option value="todos">Todos os temas</option>
-              {temas.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
-          )}
+          <select
+            aria-label="Filtrar por tema"
+            className="input text-sm"
+            value={draftFilters.tema ?? "todos"}
+            disabled={temas.length === 0}
+            onChange={(e) => setDraftFilters((f) => ({ ...f, tema: e.target.value, subtema: undefined }))}
+          >
+            <option value="todos">Todos os temas</option>
+            {temas.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
 
-          {subtemas.length > 0 && (
-            <select
-              aria-label="Filtrar por subtema"
-              className="input w-auto py-2 text-sm"
-              value={filters.subtema ?? "todos"}
-              onChange={(e) => setFilters((f) => ({ ...f, subtema: e.target.value }))}
-            >
-              <option value="todos">Todos os subtemas</option>
-              {subtemas.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
-          )}
+          <select
+            aria-label="Filtrar por subtema"
+            className="input text-sm"
+            value={draftFilters.subtema ?? "todos"}
+            disabled={subtemas.length === 0}
+            onChange={(e) => setDraftFilters((f) => ({ ...f, subtema: e.target.value }))}
+          >
+            <option value="todos">Todos os subtemas</option>
+            {subtemas.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
 
-          {bancas.length > 0 && (
-            <select
-              aria-label="Filtrar por banca"
-              className="input w-auto py-2 text-sm"
-              value={filters.banca ?? "todas"}
-              onChange={(e) => setFilters((f) => ({ ...f, banca: e.target.value }))}
-            >
-              <option value="todas">Todas as bancas</option>
-              {bancas.map((b) => (
-                <option key={b} value={b}>
-                  {b}
-                </option>
-              ))}
-            </select>
-          )}
+          <select
+            aria-label="Filtrar por banca"
+            className="input text-sm"
+            value={draftFilters.banca ?? "todas"}
+            disabled={bancas.length === 0}
+            onChange={(e) => setDraftFilters((f) => ({ ...f, banca: e.target.value }))}
+          >
+            <option value="todas">Todas as bancas</option>
+            {bancas.map((b) => (
+              <option key={b} value={b}>
+                {b}
+              </option>
+            ))}
+          </select>
 
-          {anos.length > 0 && (
-            <select
-              aria-label="Filtrar por ano"
-              className="input w-auto py-2 text-sm"
-              value={filters.ano ?? "todos"}
-              onChange={(e) => setFilters((f) => ({ ...f, ano: e.target.value }))}
-            >
-              <option value="todos">Todos os anos</option>
-              {anos.map((a) => (
-                <option key={a} value={String(a)}>
-                  {a}
-                </option>
-              ))}
-            </select>
-          )}
+          <select
+            aria-label="Filtrar por ano"
+            className="input text-sm"
+            value={draftFilters.ano ?? "todos"}
+            disabled={anos.length === 0}
+            onChange={(e) => setDraftFilters((f) => ({ ...f, ano: e.target.value }))}
+          >
+            <option value="todos">Todos os anos</option>
+            {anos.map((a) => (
+              <option key={a} value={String(a)}>
+                {a}
+              </option>
+            ))}
+          </select>
 
           <select
             aria-label="Filtrar por dificuldade"
-            className="input w-auto py-2 text-sm"
-            value={filters.dificuldade ?? "todas"}
-            onChange={(e) => setFilters((f) => ({ ...f, dificuldade: e.target.value }))}
+            className="input text-sm"
+            value={draftFilters.dificuldade ?? "todas"}
+            onChange={(e) => setDraftFilters((f) => ({ ...f, dificuldade: e.target.value }))}
           >
             <option value="todas">Todas as dificuldades</option>
             {[1, 2, 3, 4, 5].map((d) => (
@@ -211,9 +226,9 @@ function QuestoesContent() {
 
           <select
             aria-label="Filtrar por status"
-            className="input w-auto py-2 text-sm"
-            value={filters.status ?? "todos"}
-            onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))}
+            className="input text-sm"
+            value={draftFilters.status ?? "todos"}
+            onChange={(e) => setDraftFilters((f) => ({ ...f, status: e.target.value }))}
           >
             <option value="todos">Feitas ou não — todas</option>
             <option value="nao_respondida">Ainda não feitas</option>
@@ -226,7 +241,7 @@ function QuestoesContent() {
           <div className="flex flex-wrap items-center gap-1.5">
             <Tag size={13} className="text-muted-foreground mr-0.5" />
             {allTags.map((tag) => {
-              const active = (filters.tags ?? []).includes(tag);
+              const active = (draftFilters.tags ?? []).includes(tag);
               return (
                 <button
                   key={tag}
@@ -246,11 +261,22 @@ function QuestoesContent() {
           </div>
         )}
 
-        <p className="text-xs text-muted-foreground font-metric">
-          {results.length} {results.length === 1 ? "questão encontrada" : "questões encontradas"} com esses filtros
-        </p>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <p className="text-xs text-muted-foreground font-metric">
+            {results.length} {results.length === 1 ? "questão encontrada" : "questões encontradas"}
+            {hasAppliedFilters ? " com esses filtros" : ""}
+          </p>
+          <div className="flex items-center gap-2">
+            <button type="button" className="btn-outline btn-sm" onClick={clearFilters} disabled={!hasAppliedFilters && !hasDraftChanges}>
+              Limpar
+            </button>
+            <button type="button" className="btn-primary btn-sm" onClick={applyFilters} disabled={!hasDraftChanges}>
+              <Filter size={13} /> Filtrar
+            </button>
+          </div>
+        </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-border/60">
           <button type="button" className="btn-primary" onClick={() => router.push(`/questoes/estudo?${buildQuery()}`)}>
             <Brain size={15} /> Iniciar sessão personalizada
           </button>
@@ -283,7 +309,7 @@ function QuestoesContent() {
 
       {results.length === 0 ? (
         <EmptyState
-          icon={Brain}
+          illustration={<EmptySearchIllustration />}
           title="Nenhuma questão encontrada."
           description="Ajuste os filtros ou importe seu banco de questões em Configurações."
         />

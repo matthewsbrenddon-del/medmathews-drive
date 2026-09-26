@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { GraduationCap } from "lucide-react";
+import { Logo } from "@/components/Logo";
 import { useStudyStore } from "@/lib/store";
 
 export default function RootPage() {
@@ -16,7 +16,7 @@ export default function RootPage() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background">
       <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground animate-pulse">
-        <GraduationCap size={24} />
+        <Logo size={23} />
       </div>
       <p className="text-sm text-muted-foreground">Carregando o MedStudy Hub...</p>
     </div>

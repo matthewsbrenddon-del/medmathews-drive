@@ -17,6 +17,7 @@ import {
   BookOpen,
 } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
+import { EmptyBoxIllustration, EmptySearchIllustration } from "@/components/Illustrations";
 import { LoadingState } from "@/components/LoadingState";
 import { FilePreviewModal } from "@/components/FilePreviewModal";
 import { useLibraryStore } from "@/lib/libraryStore";
@@ -181,7 +182,7 @@ function DisciplinasContent() {
         <EmptyState icon={LayoutGrid} title="Não foi possível carregar a biblioteca." description="Verifique sua conexão e recarregue a página." />
       ) : searching ? (
         searchResults.length === 0 ? (
-          <EmptyState icon={Search} title="Nenhum arquivo encontrado." description="Tente outros termos de busca." />
+          <EmptyState illustration={<EmptySearchIllustration />} title="Nenhum arquivo encontrado." description="Tente outros termos de busca." />
         ) : (
           <div className="flex flex-col gap-1.5">
             <p className="text-xs text-muted-foreground font-metric">
@@ -194,7 +195,7 @@ function DisciplinasContent() {
           </div>
         )
       ) : children.length === 0 ? (
-        <EmptyState icon={Folder} title="Nada por aqui ainda." />
+        <EmptyState illustration={<EmptyBoxIllustration />} title="Nada por aqui ainda." />
       ) : (
         <div className="flex flex-col gap-1.5">
           {children.map((node) =>

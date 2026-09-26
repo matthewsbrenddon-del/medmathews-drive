@@ -1,6 +1,7 @@
 "use client";
 
-import { Brain, Flame, Layers, Target, Video as VideoIcon, BookOpen as BookOpenIcon } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Brain, Filter, Flame, Layers, Target, Video as VideoIcon, BookOpen as BookOpenIcon, X } from "lucide-react";
 import { ProgressBar } from "@/components/ProgressBar";
 import { ProgressCircle } from "@/components/ProgressCircle";
 import { SubjectIcon } from "@/components/SubjectIcon";
@@ -10,7 +11,8 @@ import { useStudyStore } from "@/lib/store";
 import { useQuestionStore } from "@/lib/questionStore";
 import { useQuestionProgressStore } from "@/lib/questionProgressStore";
 import { computeQuestionStats } from "@/lib/questionStats";
-import { resolveSubject } from "@/lib/subjects";
+import { filterQuestions, getDistinctBancas, getDistinctYears, type QuestionFilters } from "@/lib/questionFilters";
+import { getSubjectsFromItems, resolveSubject } from "@/lib/subjects";
 
 export default function ProgressoPage() {
   const content = useContent();
@@ -22,7 +24,17 @@ export default function ProgressoPage() {
   const overall = computeOverallProgress(content, userStates);
   const subjects = computeSubjectProgress(content, userStates);
   const remaining = content.length - overall.watchedLessons - overall.studiedMaterials;
-  const questionStats = computeQuestionStats(questions, questionProgress);
+
+  const [questionFilters, setQuestionFilters] = useState<QuestionFilters>({});
+  const questionSubjects = useMemo(() => getSubjectsFromItems(questions), [questions]);
+  const bancas = useMemo(() => getDistinctBancas(questions), [questions]);
+  const anos = useMemo(() => getDistinctYears(questions), [questions]);
+  const filteredQuestions = useMemo(
+    () => filterQuestions(questions, questionFilters, questionProgress),
+    [questions, questionFilters, questionProgress]
+  );
+  const questionStats = computeQuestionStats(filteredQuestions, questionProgress);
+  const hasActiveFilters = Object.values(questionFilters).some(Boolean);
 
   return (
     <div className="flex flex-col gap-9">
@@ -93,7 +105,75 @@ export default function ProgressoPage() {
       </section>
 
       <section>
-        <h2 className="text-lg font-semibold text-foreground mb-4">Desempenho em questões</h2>
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <h2 className="text-lg font-semibold text-foreground">Desempenho em questões</h2>
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={() => setQuestionFilters({})}
+              className="text-xs font-medium text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+            >
+              <X size={12} /> Limpar filtros
+            </button>
+          )}
+        </div>
+
+        <div className="card p-4 flex flex-wrap items-center gap-2.5 mb-4">
+          <Filter size={14} className="text-muted-foreground shrink-0" />
+          <select
+            aria-label="Filtrar por disciplina"
+            value={questionFilters.disciplina ?? "todas"}
+            onChange={(e) => setQuestionFilters((f) => ({ ...f, disciplina: e.target.value }))}
+            className="input w-auto py-1.5 text-sm"
+          >
+            <option value="todas">Todas as disciplinas</option>
+            {questionSubjects.map((s) => (
+              <option key={s.slug} value={s.slug}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+          <select
+            aria-label="Filtrar por banca"
+            value={questionFilters.banca ?? "todas"}
+            onChange={(e) => setQuestionFilters((f) => ({ ...f, banca: e.target.value }))}
+            className="input w-auto py-1.5 text-sm"
+          >
+            <option value="todas">Todas as bancas</option>
+            {bancas.map((b) => (
+              <option key={b} value={b}>
+                {b}
+              </option>
+            ))}
+          </select>
+          <select
+            aria-label="Filtrar por ano"
+            value={questionFilters.ano ?? "todos"}
+            onChange={(e) => setQuestionFilters((f) => ({ ...f, ano: e.target.value }))}
+            className="input w-auto py-1.5 text-sm"
+          >
+            <option value="todos">Todos os anos</option>
+            {anos.map((a) => (
+              <option key={a} value={String(a)}>
+                {a}
+              </option>
+            ))}
+          </select>
+          <select
+            aria-label="Filtrar por dificuldade"
+            value={questionFilters.dificuldade ?? "todas"}
+            onChange={(e) => setQuestionFilters((f) => ({ ...f, dificuldade: e.target.value }))}
+            className="input w-auto py-1.5 text-sm"
+          >
+            <option value="todas">Todas as dificuldades</option>
+            {[1, 2, 3, 4, 5].map((d) => (
+              <option key={d} value={String(d)}>
+                Dificuldade {d}
+              </option>
+            ))}
+          </select>
+        </div>
+
         {questionStats.overall.answered === 0 ? (
           <div className="card p-6 flex items-center gap-4">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-accent/10 text-accent shrink-0">

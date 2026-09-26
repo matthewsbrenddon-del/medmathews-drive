@@ -1,8 +1,23 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, Calendar, Check, Clock, Loader2, PartyPopper, RotateCcw, Settings2, Sparkles } from "lucide-react";
+import {
+  AlertTriangle,
+  Calendar,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Inbox,
+  Loader2,
+  PartyPopper,
+  Plus,
+  RotateCcw,
+  Settings2,
+  Sparkles,
+  X,
+} from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { PriorityBadge } from "@/components/PriorityBadge";
 import { useContent } from "@/lib/content";
@@ -10,10 +25,18 @@ import { useStudyStore } from "@/lib/store";
 import { useQuestionStore } from "@/lib/questionStore";
 import { useQuestionProgressStore } from "@/lib/questionProgressStore";
 import { useScheduleStore } from "@/lib/scheduleStore";
-import { getSubjectsFromContentAndQuestions } from "@/lib/subjects";
+import { getSubjectsFromContentAndQuestions, resolveSubject } from "@/lib/subjects";
 import { getRecommendedTemas } from "@/lib/questionStats";
 import { buildStudyPlan, type PlanItem } from "@/lib/studyPlan";
-import { formatDayLabel, todayIso } from "@/lib/dateUtil";
+import {
+  addDaysIso,
+  formatDayLabel,
+  formatDayNum,
+  formatWeekRangeLabel,
+  formatWeekdayShort,
+  startOfWeekIso,
+  todayIso,
+} from "@/lib/dateUtil";
 import { cn } from "@/lib/utils";
 
 function SetupForm() {
@@ -169,6 +192,140 @@ interface AiPlannedDay {
   items: { item: PlanItem; justificativa?: string }[];
 }
 
+interface DayEntry {
+  items: { item: PlanItem; justificativa?: string }[];
+  budgetMinutes?: number;
+  totalMinutes?: number;
+}
+
+function DayPanel({
+  date,
+  entry,
+  onClose,
+}: {
+  date: string;
+  entry: DayEntry | undefined;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const items = entry?.items ?? [];
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end bg-foreground/40 backdrop-blur-sm animate-fade-in" onClick={onClose}>
+      <div
+        className="h-full w-full max-w-md bg-surface border-l border-border shadow-lift flex flex-col animate-slide-in-right"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-3 p-5 border-b border-border/60">
+          <div>
+            <p className="text-xs text-muted-foreground">Dia de estudo</p>
+            <h2 className="font-semibold text-foreground">{formatDayLabel(date)}</h2>
+          </div>
+          <div className="flex items-center gap-3">
+            {entry?.budgetMinutes != null && (
+              <span className="text-xs font-metric text-muted-foreground">
+                {entry.totalMinutes} / {entry.budgetMinutes} min
+              </span>
+            )}
+            <button type="button" onClick={onClose} aria-label="Fechar" className="text-muted-foreground hover:text-foreground">
+              <X size={20} />
+            </button>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-5">
+          {items.length === 0 ? (
+            <div className="flex flex-col items-center text-center gap-3 py-16">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+                <Inbox size={22} />
+              </div>
+              <p className="text-sm text-muted-foreground">Nenhum item agendado para este dia.</p>
+            </div>
+          ) : (
+            items.map(({ item, justificativa }) => <ItemRow key={item.key} item={item} justificativa={justificativa} />)
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WeekGrid({
+  weekDates,
+  daysByDate,
+}: {
+  weekDates: string[];
+  daysByDate: Map<string, DayEntry>;
+}) {
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const today = todayIso();
+
+  return (
+    <>
+      <div className="grid grid-cols-7 gap-2">
+        {weekDates.map((date) => {
+          const entry = daysByDate.get(date);
+          const items = entry?.items ?? [];
+          const isToday = date === today;
+          const visible = items.slice(0, 3);
+          const extra = items.length - visible.length;
+          return (
+            <button
+              key={date}
+              type="button"
+              onClick={() => setSelectedDate(date)}
+              className={cn(
+                "flex flex-col gap-2 rounded-xl border p-2.5 text-left min-h-[140px] transition-colors hover:border-primary/50",
+                isToday ? "border-primary/60 bg-primary-light/30" : "border-border bg-surface"
+              )}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] uppercase text-muted-foreground font-medium">{formatWeekdayShort(date)}</span>
+                <span className={cn("text-sm font-metric font-semibold", isToday ? "text-primary" : "text-foreground")}>
+                  {formatDayNum(date)}
+                </span>
+              </div>
+
+              {items.length === 0 ? (
+                <div className="flex-1 flex items-center justify-center text-muted-foreground/50">
+                  <Plus size={16} />
+                </div>
+              ) : (
+                <div className="flex flex-col gap-1.5">
+                  {visible.map(({ item }) => {
+                    const subject = resolveSubject(item.subjectSlug);
+                    return (
+                      <div
+                        key={item.key}
+                        className="rounded-lg border-l-2 bg-muted px-2 py-1.5"
+                        style={{ borderColor: `hsl(${subject.colorToken})` }}
+                      >
+                        <p className="text-[11px] font-medium text-foreground line-clamp-2 leading-tight">{item.title}</p>
+                      </div>
+                    );
+                  })}
+                  {extra > 0 && <p className="text-[11px] text-muted-foreground font-metric px-0.5">+{extra} mais</p>}
+                </div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {selectedDate && (
+        <DayPanel date={selectedDate} entry={daysByDate.get(selectedDate)} onClose={() => setSelectedDate(null)} />
+      )}
+    </>
+  );
+}
+
 function PlanView() {
   const content = useContent();
   const userStates = useStudyStore((s) => s.userStates);
@@ -193,12 +350,26 @@ function PlanView() {
     [content, userStates, questions, questionProgress, config, postponed]
   );
 
-  const daysWithItems = plan.days.filter((d) => d.items.length > 0);
   const isAllDone = plan.totalPendingMinutes === 0;
 
   const [aiPlan, setAiPlan] = useState<AiPlannedDay[] | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [weekStart, setWeekStart] = useState(() => startOfWeekIso(todayIso()));
+
+  const weekDates = useMemo(() => Array.from({ length: 7 }, (_, i) => addDaysIso(weekStart, i)), [weekStart]);
+
+  const daysByDate = useMemo(() => {
+    const map = new Map<string, DayEntry>();
+    if (aiPlan) {
+      for (const d of aiPlan) map.set(d.date, { items: d.items });
+    } else {
+      for (const d of plan.days) {
+        map.set(d.date, { items: d.items.map((item) => ({ item })), budgetMinutes: d.budgetMinutes, totalMinutes: d.totalMinutes });
+      }
+    }
+    return map;
+  }, [aiPlan, plan.days]);
 
   async function handleRecalcularComIA() {
     setAiLoading(true);
@@ -290,25 +461,15 @@ function PlanView() {
           title="Tudo em dia!"
           description="Você concluiu todo o conteúdo e questões pendentes das disciplinas selecionadas para este cronograma."
         />
-      ) : aiPlan ? (
-        <div className="flex flex-col gap-4">
-          <p className="text-xs text-muted-foreground inline-flex items-center gap-1">
-            <Sparkles size={12} /> Plano reorganizado pela IA — ajustes manuais (marcar feito, adiar) não exigem nova chamada.
-          </p>
-          {aiPlan.map((day) => (
-            <div key={day.date} className="card p-5">
-              <h2 className="font-semibold text-foreground mb-2">{formatDayLabel(day.date)}</h2>
-              <div>
-                {day.items.map(({ item, justificativa }) => (
-                  <ItemRow key={item.key} item={item} justificativa={justificativa} />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
       ) : (
         <>
-          {plan.overflow.length > 0 && (
+          {aiPlan && (
+            <p className="text-xs text-muted-foreground inline-flex items-center gap-1">
+              <Sparkles size={12} /> Plano reorganizado pela IA — ajustes manuais (marcar feito, adiar) não exigem nova chamada.
+            </p>
+          )}
+
+          {!aiPlan && plan.overflow.length > 0 && (
             <div className="rounded-xl border border-warning/30 bg-warning/5 p-4 flex items-start gap-3">
               <AlertTriangle size={16} className="text-warning shrink-0 mt-0.5" />
               <p className="text-sm text-foreground">
@@ -318,23 +479,34 @@ function PlanView() {
             </div>
           )}
 
-          <div className="flex flex-col gap-4">
-            {daysWithItems.slice(0, 30).map((day) => (
-              <div key={day.date} className="card p-5">
-                <div className="flex items-center justify-between mb-2">
-                  <h2 className="font-semibold text-foreground">{formatDayLabel(day.date)}</h2>
-                  <span className="text-xs font-metric text-muted-foreground">
-                    {day.totalMinutes} / {day.budgetMinutes} min
-                  </span>
-                </div>
-                <div>
-                  {day.items.map((item) => (
-                    <ItemRow key={item.key} item={item} />
-                  ))}
-                </div>
-              </div>
-            ))}
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setWeekStart((w) => addDaysIso(w, -7))}
+                aria-label="Semana anterior"
+                className="btn-ghost btn-sm"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <button type="button" onClick={() => setWeekStart(startOfWeekIso(todayIso()))} className="btn-outline btn-sm">
+                Hoje
+              </button>
+              <button
+                type="button"
+                onClick={() => setWeekStart((w) => addDaysIso(w, 7))}
+                aria-label="Próxima semana"
+                className="btn-ghost btn-sm"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+            <p className="text-sm font-medium text-foreground font-metric">
+              {formatWeekRangeLabel(weekDates[0], weekDates[6])}
+            </p>
           </div>
+
+          <WeekGrid weekDates={weekDates} daysByDate={daysByDate} />
         </>
       )}
     </div>

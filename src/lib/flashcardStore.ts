@@ -3,13 +3,15 @@
 // ============================================================================
 // Flashcards — decks e cartões, persistidos em localStorage.
 //
-// "Geração com IA" de verdade (um modelo de linguagem lendo o material e
-// escrevendo os cartões) não está implementada nesta versão — não há
-// nenhum provedor de IA configurado no app (ver README). O que funciona
-// hoje, de forma determinística e sem depender de IA externa, é gerar
-// cartões automaticamente a partir do banco de questões (enunciado ->
-// frente, resposta comentada -> verso) — um "loop fechado" simples: toda
-// questão errada vira um cartão de revisão com um clique.
+// Este store cuida só da persistência (decks/cartões); a geração em si vem
+// de duas fontes independentes:
+// - determinística, sem IA: gerar cartões a partir do banco de questões
+//   (enunciado -> frente, resposta comentada -> verso) via
+//   `generateFromQuestions` — um "loop fechado" simples, toda questão errada
+//   vira um cartão de revisão com um clique.
+// - com IA (opcional, exige ANTHROPIC_API_KEY — ver README): `/api/ai/flashcards`
+//   escreve cartões a partir de questões do banco OU de um tema/material livre;
+//   os aprovados na tela de revisão chegam aqui via `addGeneratedCards`.
 // ============================================================================
 
 import { create } from "zustand";

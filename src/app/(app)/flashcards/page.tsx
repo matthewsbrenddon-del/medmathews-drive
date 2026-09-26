@@ -79,6 +79,7 @@ export default function FlashcardsPage() {
               type="text"
               value={deckName}
               onChange={(e) => setDeckName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleCreateDeck()}
               placeholder="Nome do deck (ex.: Cirurgia Geral — Revisão)"
               className="input flex-1 min-w-[220px]"
             />
@@ -319,8 +320,10 @@ function AiGeneratePanel({
   return (
     <div className="flex flex-col gap-3 animate-fade-in border-t border-border/60 pt-4">
       <p className="text-xs text-muted-foreground">
-        A IA lê os casos clínicos selecionados do banco de questões (não temos acesso ao texto de aulas/apostilas do Drive)
-        e escreve cartões de recuperação ativa. Revise, edite ou descarte antes de salvar.
+        {mode === "banco"
+          ? "A IA lê os casos clínicos selecionados do banco de questões (não temos acesso ao texto de aulas/apostilas do Drive) e escreve cartões de recuperação ativa."
+          : "A IA escreve cartões de recuperação ativa a partir do tema e do material de referência que você colar abaixo."}{" "}
+        Revise, edite ou descarte antes de salvar.
       </p>
 
       {!reviewCards && (

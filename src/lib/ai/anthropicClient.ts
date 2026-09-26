@@ -32,4 +32,4 @@ export function getAnthropicClient(): Anthropic | null {
 }
 
 export const AI_UNAVAILABLE_MESSAGE =
-  "Recursos de IA indisponíveis: configure a variável de ambiente ANTHROPIC_API_KEY na Vercel para habilitar a geração de flashcards e o cronograma adaptativo com IA. O restante da plataforma funciona normalmente sem ela.";
+  "Recursos de IA indisponíveis: configure a variável de ambiente ANTHROPIC_API_KEY na Vercel para habilitar os Quizzes com IA, a geração de flashcards e o cronograma adaptativo com IA. O restante da plataforma funciona normalmente sem ela.";

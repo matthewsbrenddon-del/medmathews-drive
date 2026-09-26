@@ -53,14 +53,25 @@ Ambas abrem o mesmo `FilePreviewModal` (preview do Drive embutido num iframe, se
 
 O acervo não entra no `contentStore`/`studyPlan`: o cronograma adaptativo continua operando só sobre a grade curada de exemplo — não faria sentido agendar 13,6 mil itens automaticamente. `src/lib/libraryStore.ts` busca o JSON uma única vez por sessão, sem persistir em `localStorage` (grande demais e é referência estática).
 
-## IA para flashcards e cronograma (opcional)
+## IA para quizzes, flashcards e cronograma (opcional)
 
-Dois recursos adicionais — nunca substitutivos — usam a API da Claude quando `ANTHROPIC_API_KEY` está configurada (veja `.env.example`); sem a chave, ambos ficam indisponíveis com uma mensagem clara na interface e o resto da plataforma continua funcionando normalmente:
+Três recursos adicionais — nunca substitutivos — usam a API da Claude quando `ANTHROPIC_API_KEY` está configurada (veja `.env.example`); sem a chave, os três ficam indisponíveis com uma mensagem clara na interface e o resto da plataforma continua funcionando normalmente:
 
-- **Gerar flashcards com IA** (`/api/ai/flashcards`, modelo Claude Haiku): a partir de questões do banco selecionadas como material de origem (a plataforma não extrai texto de PDFs/vídeos do Drive — só temos o ID do arquivo e o link), a IA escreve cartões de recuperação ativa. Os cartões passam por uma tela de revisão (editar/descartar/aprovar em lote) antes de serem salvos no deck.
+- **Quizzes** (`/quizzes`, `/api/ai/quiz`, modelo Claude Sonnet): gera questões de múltipla escolha em tempo real a partir de um tema/instrução e, opcionalmente, um material de referência colado (texto). Cada questão gerada passa por uma tela de revisão (editar enunciado/alternativas/gabarito/comentário, aprovar ou descartar) antes de entrar no Banco de Questões, marcada com `origem: "ia"`.
+- **Gerar flashcards com IA** (`/api/ai/flashcards`, modelo Claude Haiku, em **Flashcards**): dois modos — a partir de questões do banco selecionadas como material de origem, ou a partir de um tema livre + material de referência colado. Os cartões passam por uma tela de revisão (editar/descartar/aprovar em lote) antes de serem salvos no deck.
 - **Recalcular com IA** (`/api/ai/cronograma`, modelo Claude Sonnet, em **Cronograma**): reorganiza os mesmos itens pendentes do algoritmo determinístico (`src/lib/studyPlan.ts`), levando em conta o desempenho por tema no banco de questões, e acrescenta uma justificativa curta para os itens de alta prioridade. Só roda quando o usuário clica no botão — nunca automaticamente, para controlar custo. O algoritmo determinístico continua sendo o padrão/fallback.
 
 A chave nunca é exposta no navegador — toda chamada à API da Claude acontece em `src/app/api/ai/*` (server-side), via `src/lib/ai/anthropicClient.ts`.
+
+## Práticas: Quizzes, Simulado, Cadernos, grifo e exportação em PDF
+
+A área de prática (Questões, Quizzes, Flashcards, Simulado e Cadernos, agrupados sob "Prática" na barra lateral) compartilha um único motor de bateria de questões (`src/components/QuestionBattery.tsx`), usado tanto no Banco de Questões (`/questoes/estudo`) quanto nos Cadernos pessoais (`/cadernos/[id]`):
+
+- **Grifo de texto**: selecione qualquer trecho do enunciado ou de uma alternativa com o mouse para marcá-lo em uma de 4 cores fixas (amarelo/rosa/verde/ciano), legíveis tanto no tema claro quanto no escuro. Os grifos são persistidos por questão em `src/lib/highlightStore.ts`, indexados por offset de texto (não pela posição no DOM), então sobrevivem a re-renderizações.
+- **Foco**: botão flutuante que alterna entre o feed contínuo (todas as questões da bateria, rolável) e um modo carrossel (uma questão por vez, com Anterior/Próxima).
+- **Por questão**: favoritar (★), adicionar a um ou mais **Cadernos** pessoais (`src/lib/notebookStore.ts` — coleções nomeadas de questões, sem depender de disciplina/tema) e minimizar (colapsa para uma linha).
+- **Exportação em PDF** (`src/lib/pdfExport.ts`, via `jspdf`): exporta a bateria filtrada atual em um PDF formatado, com marca d'água da plataforma em todas as páginas, nome do aluno (definido em **Configurações → Seu nome**) e data na capa, e gabarito comentado ao final. Limitada a 100 questões por exportação — para exportar o restante, informe "a partir da questão" no topo da bateria (ou navegue até lá em modo Foco) e exporte novamente a partir dali.
+- **Cronômetro de sessão** (`src/lib/useStudyTimer.ts` + `src/lib/studySessionStore.ts`): mede automaticamente o tempo líquido gasto em cada sessão de Questões/Simulado/Flashcards (sessões residuais de menos de 3s não contam) e alimenta o painel **Horas líquidas de estudo** em **Meu Progresso**, filtrável por 24h/7 dias/mensal/anual/período selecionável, com detalhamento por tipo de sessão.
 
 ## Banco de dados / produção
 

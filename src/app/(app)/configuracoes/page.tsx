@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { RefreshCcw, Info, Moon, Database, ClipboardList } from "lucide-react";
+import { RefreshCcw, Info, Moon, Database, ClipboardList, User } from "lucide-react";
 import { ConfirmationModal } from "@/components/ConfirmationModal";
 import { ImportCoursesPanel } from "@/components/ImportCoursesPanel";
 import { ImportQuestionsPanel } from "@/components/ImportQuestionsPanel";
@@ -10,6 +10,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { useContentStore } from "@/lib/contentStore";
 import { useQuestionStore } from "@/lib/questionStore";
 import { useClassificationStore } from "@/lib/classificationStore";
+import { useStudyStore } from "@/lib/store";
 import { formatRelativeDate } from "@/lib/utils";
 
 export default function ConfiguracoesPage() {
@@ -20,6 +21,8 @@ export default function ConfiguracoesPage() {
   const resetQuestions = useQuestionStore((s) => s.resetToDemo);
   const classificationCount = useClassificationStore((s) => Object.keys(s.overrides).length);
   const resetClassification = useClassificationStore((s) => s.resetAll);
+  const studentName = useStudyStore((s) => s.studentName);
+  const setStudentName = useStudyStore((s) => s.setStudentName);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmClassificationOpen, setConfirmClassificationOpen] = useState(false);
 
@@ -40,6 +43,26 @@ export default function ConfiguracoesPage() {
         <h1 className="text-2xl font-semibold text-foreground">Configurações</h1>
         <p className="text-muted-foreground mt-1">Importe sua biblioteca de estudos e ajuste preferências.</p>
       </div>
+
+      <section className="card p-5 flex items-center gap-4">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent/10 text-accent shrink-0">
+          <User size={19} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <label htmlFor="student-name" className="font-medium text-foreground block">
+            Seu nome
+          </label>
+          <p className="text-sm text-muted-foreground mt-0.5 mb-2">Usado na capa dos PDFs exportados de questões.</p>
+          <input
+            id="student-name"
+            type="text"
+            value={studentName}
+            onChange={(e) => setStudentName(e.target.value)}
+            placeholder="Ex.: Ana Souza"
+            className="input max-w-xs"
+          />
+        </div>
+      </section>
 
       {!hasImported && (
         <section className="rounded-2xl border border-accent/20 bg-accent/5 p-5 flex gap-3">

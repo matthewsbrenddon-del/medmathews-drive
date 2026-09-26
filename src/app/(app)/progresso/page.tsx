@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Brain, Filter, Flame, Layers, Target, Video as VideoIcon, BookOpen as BookOpenIcon, X } from "lucide-react";
+import { Brain, Clock, Filter, Flame, Layers, Target, Video as VideoIcon, BookOpen as BookOpenIcon, X } from "lucide-react";
 import { ProgressBar } from "@/components/ProgressBar";
 import { ProgressCircle } from "@/components/ProgressCircle";
 import { SubjectIcon } from "@/components/SubjectIcon";
@@ -13,6 +13,142 @@ import { useQuestionProgressStore } from "@/lib/questionProgressStore";
 import { computeQuestionStats } from "@/lib/questionStats";
 import { filterQuestions, getDistinctBancas, getDistinctYears, type QuestionFilters } from "@/lib/questionFilters";
 import { getSubjectsFromItems, resolveSubject } from "@/lib/subjects";
+import {
+  useStudySessionStore,
+  sumDurationSeconds,
+  sumDurationSecondsInRange,
+  STUDY_KIND_LABELS,
+  type TimeRangeFilter,
+} from "@/lib/studySessionStore";
+import { formatDuration, cn } from "@/lib/utils";
+import type { StudySession } from "@/lib/types";
+
+const RANGE_OPTIONS: { id: TimeRangeFilter; label: string }[] = [
+  { id: "24h", label: "24h" },
+  { id: "7d", label: "7 dias" },
+  { id: "30d", label: "Mensal" },
+  { id: "12m", label: "Anual" },
+  { id: "todos", label: "Tudo" },
+];
+
+function todayInputValue(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function StudyTimeSection() {
+  const sessions = useStudySessionStore((s) => s.sessions);
+  const [range, setRange] = useState<TimeRangeFilter | "custom">("7d");
+  const [customStart, setCustomStart] = useState(todayInputValue());
+  const [customEnd, setCustomEnd] = useState(todayInputValue());
+
+  const totalSeconds = useMemo(() => {
+    if (range === "custom") {
+      const startIso = new Date(`${customStart}T00:00:00`).toISOString();
+      const endIso = new Date(`${customEnd}T23:59:59.999`).toISOString();
+      return sumDurationSecondsInRange(sessions, startIso, endIso);
+    }
+    return sumDurationSeconds(sessions, range);
+  }, [sessions, range, customStart, customEnd]);
+
+  const byKind = useMemo(() => {
+    const kinds = Object.keys(STUDY_KIND_LABELS) as StudySession["kind"][];
+    return kinds
+      .map((kind) => {
+        const kindSessions = sessions.filter((s) => s.kind === kind);
+        const seconds =
+          range === "custom"
+            ? sumDurationSecondsInRange(
+                kindSessions,
+                new Date(`${customStart}T00:00:00`).toISOString(),
+                new Date(`${customEnd}T23:59:59.999`).toISOString()
+              )
+            : sumDurationSeconds(kindSessions, range);
+        return { kind, label: STUDY_KIND_LABELS[kind], seconds };
+      })
+      .filter((k) => k.seconds > 0)
+      .sort((a, b) => b.seconds - a.seconds);
+  }, [sessions, range, customStart, customEnd]);
+
+  return (
+    <section>
+      <h2 className="text-lg font-semibold text-foreground mb-4">Horas líquidas de estudo</h2>
+      <div className="card p-6 flex flex-col gap-5">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {RANGE_OPTIONS.map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => setRange(opt.id)}
+              className={cn(
+                "px-3 py-1.5 rounded-full text-xs font-medium transition-colors",
+                range === opt.id ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {opt.label}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => setRange("custom")}
+            className={cn(
+              "px-3 py-1.5 rounded-full text-xs font-medium transition-colors",
+              range === "custom" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"
+            )}
+          >
+            Período selecionável
+          </button>
+        </div>
+
+        {range === "custom" && (
+          <div className="flex flex-wrap items-center gap-2.5">
+            <label className="text-xs text-muted-foreground inline-flex items-center gap-1.5">
+              De
+              <input
+                type="date"
+                value={customStart}
+                max={customEnd}
+                onChange={(e) => setCustomStart(e.target.value)}
+                className="input py-1 text-xs w-auto"
+              />
+            </label>
+            <label className="text-xs text-muted-foreground inline-flex items-center gap-1.5">
+              Até
+              <input
+                type="date"
+                value={customEnd}
+                min={customStart}
+                max={todayInputValue()}
+                onChange={(e) => setCustomEnd(e.target.value)}
+                className="input py-1 text-xs w-auto"
+              />
+            </label>
+          </div>
+        )}
+
+        <div className="flex items-center gap-6">
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-primary-light text-primary">
+            <Clock size={26} />
+          </div>
+          <div>
+            <p className="text-2xl font-semibold font-metric text-foreground">{formatDuration(totalSeconds)}</p>
+            <p className="text-sm text-muted-foreground">de estudo líquido no período selecionado</p>
+          </div>
+        </div>
+
+        {byKind.length > 0 && (
+          <div className="divide-y divide-border">
+            {byKind.map((k) => (
+              <div key={k.kind} className="flex items-center justify-between gap-3 py-2.5">
+                <p className="text-sm text-foreground">{k.label}</p>
+                <span className="text-xs font-metric text-muted-foreground">{formatDuration(k.seconds)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
 
 export default function ProgressoPage() {
   const content = useContent();
@@ -78,6 +214,8 @@ export default function ProgressoPage() {
           </div>
         </div>
       </section>
+
+      <StudyTimeSection />
 
       <section>
         <h2 className="text-lg font-semibold text-foreground mb-4">Progresso por disciplina</h2>

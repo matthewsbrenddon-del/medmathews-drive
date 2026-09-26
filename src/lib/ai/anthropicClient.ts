@@ -15,6 +15,9 @@ export const AI_MODELS = {
   flashcards: "claude-haiku-4-5-20251001",
   /** Cronograma adaptativo — chamada pouco frequente, raciocínio mais robusto. */
   cronograma: "claude-sonnet-5",
+  /** Quizzes (questões de múltipla escolha geradas em tempo real) — precisa de
+   * raciocínio clínico consistente para gabarito/comentário corretos. */
+  quiz: "claude-sonnet-5",
 } as const;
 
 export function isAiConfigured(): boolean {

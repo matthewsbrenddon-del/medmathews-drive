@@ -235,8 +235,11 @@ function AiGeneratePanel({
 }) {
   const addGeneratedCards = useFlashcardStore((s) => s.addGeneratedCards);
 
+  const [mode, setMode] = useState<"banco" | "tema">("banco");
   const [source, setSource] = useState<"erradas" | "todas">("erradas");
   const [subjectSlug, setSubjectSlug] = useState("todas");
+  const [topic, setTopic] = useState("");
+  const [materialText, setMaterialText] = useState("");
   const [deckId, setDeckId] = useState("");
   const [quantidade, setQuantidade] = useState(15);
   const [loading, setLoading] = useState(false);
@@ -247,28 +250,34 @@ function AiGeneratePanel({
   const pool = source === "erradas" ? wrongQuestions : questions;
   const filtered = subjectSlug === "todas" ? pool : pool.filter((q) => q.subjectSlug === subjectSlug);
   const sourceQuestions = filtered.slice(0, AI_MAX_SOURCE_QUESTIONS);
+  const canGenerate = mode === "banco" ? sourceQuestions.length > 0 : topic.trim().length > 0;
 
   async function handleGenerate() {
-    if (sourceQuestions.length === 0) return;
+    if (!canGenerate) return;
     setLoading(true);
     setError(null);
     setReviewCards(null);
     setSaved(null);
     try {
+      const payload =
+        mode === "banco"
+          ? {
+              quantidade,
+              questions: sourceQuestions.map((q) => ({
+                id: q.id,
+                subjectName: q.subjectName,
+                tema: q.tema,
+                enunciado: q.enunciado,
+                alternatives: q.alternatives,
+                gabarito: q.gabarito,
+              })),
+            }
+          : { quantidade, topic: topic.trim(), materialText: materialText.trim() || undefined };
+
       const res = await fetch("/api/ai/flashcards", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          quantidade,
-          questions: sourceQuestions.map((q) => ({
-            id: q.id,
-            subjectName: q.subjectName,
-            tema: q.tema,
-            enunciado: q.enunciado,
-            alternatives: q.alternatives,
-            gabarito: q.gabarito,
-          })),
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -276,12 +285,12 @@ function AiGeneratePanel({
         return;
       }
       setReviewCards(
-        (data.cards as { questionId: string; frente: string; verso: string; tema: string }[]).map((c, i) => ({
-          tempId: `${c.questionId}-${i}`,
+        (data.cards as { questionId?: string; frente: string; verso: string; tema: string }[]).map((c, i) => ({
+          tempId: `${c.questionId ?? "tema"}-${i}`,
           frente: c.frente,
           verso: c.verso,
           tema: c.tema,
-          sourceQuestionId: c.questionId || undefined,
+          sourceQuestionId: c.questionId,
           approved: true,
         }))
       );
@@ -315,40 +324,81 @@ function AiGeneratePanel({
       </p>
 
       {!reviewCards && (
-        <div className="flex flex-wrap gap-2.5 items-center">
-          <select value={source} onChange={(e) => setSource(e.target.value as "erradas" | "todas")} className="input w-auto">
-            <option value="erradas">Só questões que já errei ({wrongQuestions.length})</option>
-            <option value="todas">Todas as questões do banco ({questions.length})</option>
-          </select>
-          <select value={subjectSlug} onChange={(e) => setSubjectSlug(e.target.value)} className="input w-auto">
-            <option value="todas">Todas as disciplinas</option>
-            {subjects.map((s) => (
-              <option key={s.slug} value={s.slug}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-          <input
-            type="number"
-            min={1}
-            max={40}
-            value={quantidade}
-            onChange={(e) => setQuantidade(Number(e.target.value) || 15)}
-            className="input w-24"
-            aria-label="Quantidade de cartões"
-          />
-          <button type="button" className="btn-primary" onClick={handleGenerate} disabled={loading || sourceQuestions.length === 0}>
-            {loading ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-            {loading ? "Gerando..." : "Gerar cartões"}
-          </button>
-          {sourceQuestions.length === 0 && (
-            <p className="text-xs text-muted-foreground w-full">Nenhuma questão disponível com esses filtros.</p>
+        <div className="flex flex-col gap-3">
+          <div className="inline-flex rounded-lg border border-border p-0.5 bg-muted self-start">
+            <button
+              type="button"
+              onClick={() => setMode("banco")}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${mode === "banco" ? "bg-surface shadow-card text-foreground" : "text-muted-foreground"}`}
+            >
+              A partir de questões do banco
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("tema")}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${mode === "tema" ? "bg-surface shadow-card text-foreground" : "text-muted-foreground"}`}
+            >
+              A partir de um tema/prompt
+            </button>
+          </div>
+
+          {mode === "banco" ? (
+            <div className="flex flex-wrap gap-2.5 items-center">
+              <select value={source} onChange={(e) => setSource(e.target.value as "erradas" | "todas")} className="input w-auto">
+                <option value="erradas">Só questões que já errei ({wrongQuestions.length})</option>
+                <option value="todas">Todas as questões do banco ({questions.length})</option>
+              </select>
+              <select value={subjectSlug} onChange={(e) => setSubjectSlug(e.target.value)} className="input w-auto">
+                <option value="todas">Todas as disciplinas</option>
+                {subjects.map((s) => (
+                  <option key={s.slug} value={s.slug}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+              {sourceQuestions.length === 0 && (
+                <p className="text-xs text-muted-foreground w-full">Nenhuma questão disponível com esses filtros.</p>
+              )}
+              {sourceQuestions.length > 0 && (
+                <p className="text-xs text-muted-foreground w-full">
+                  Material de origem: {sourceQuestions.length} questão(ões){filtered.length > sourceQuestions.length ? ` (de ${filtered.length} — limitado a ${AI_MAX_SOURCE_QUESTIONS} por chamada)` : ""}.
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2.5">
+              <input
+                type="text"
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                placeholder="Tema (ex.: Distúrbios hidroeletrolíticos — hiponatremia)"
+                className="input"
+              />
+              <textarea
+                value={materialText}
+                onChange={(e) => setMaterialText(e.target.value)}
+                placeholder="Material de referência (opcional) — cole um trecho de texto para a IA usar como base"
+                rows={4}
+                className="input text-sm"
+              />
+            </div>
           )}
-          {sourceQuestions.length > 0 && (
-            <p className="text-xs text-muted-foreground w-full">
-              Material de origem: {sourceQuestions.length} questão(ões){filtered.length > sourceQuestions.length ? ` (de ${filtered.length} — limitado a ${AI_MAX_SOURCE_QUESTIONS} por chamada)` : ""}.
-            </p>
-          )}
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            <input
+              type="number"
+              min={1}
+              max={40}
+              value={quantidade}
+              onChange={(e) => setQuantidade(Number(e.target.value) || 15)}
+              className="input w-24"
+              aria-label="Quantidade de cartões"
+            />
+            <button type="button" className="btn-primary" onClick={handleGenerate} disabled={loading || !canGenerate}>
+              {loading ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+              {loading ? "Gerando..." : "Gerar cartões"}
+            </button>
+          </div>
         </div>
       )}
 

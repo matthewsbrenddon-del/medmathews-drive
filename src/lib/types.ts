@@ -114,6 +114,8 @@ export interface Question {
    * `gabarito` fica vazio nesse caso. Continua visível para leitura, mas não é
    * pontuada em Modo Estudo/Prova nem entra nas estatísticas de desempenho. */
   anulada?: boolean;
+  /** "ia" quando a questão foi gerada em Quizzes — ausente/"banco" para as demais. */
+  origem?: "banco" | "ia";
 }
 
 /** Estado do usuário para uma questão — histórico usado na revisão espaçada simples. */
@@ -162,6 +164,49 @@ export interface FlashcardProgress {
   dueDate: string; // ISO date (yyyy-mm-dd)
   lastReviewedAt?: string;
   reviewCount: number;
+}
+
+// ---------------------------------------------------------------------------
+// Cadernos — coleções nomeadas de questões, criadas livremente pelo usuário
+// (independente de disciplina/tema), tipo uma pasta de revisão pessoal.
+// ---------------------------------------------------------------------------
+
+export interface Notebook {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// Marcação de texto (grifos) — 4 cores fixas, visíveis em claro e escuro.
+// Cada marcação é um intervalo [start, end) sobre o texto puro de um campo
+// específico de uma questão (enunciado ou uma alternativa).
+// ---------------------------------------------------------------------------
+
+export type HighlightColor = "amarelo" | "rosa" | "verde" | "ciano";
+
+export interface Highlight {
+  id: string;
+  questionId: string;
+  /** Campo marcado: o enunciado ou a alternativa (pela letra). */
+  field: "enunciado" | "A" | "B" | "C" | "D" | "E";
+  start: number;
+  end: number;
+  color: HighlightColor;
+  createdAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// Cronômetro de sessões de estudo (Quizzes/Simulado/Flashcards) — alimenta
+// "horas líquidas de estudo" em Meu Progresso, filtrável por período.
+// ---------------------------------------------------------------------------
+
+export interface StudySession {
+  id: string;
+  kind: "quiz" | "simulado" | "flashcards" | "estudo";
+  startedAt: string; // ISO datetime
+  endedAt: string; // ISO datetime
+  durationSeconds: number;
 }
 
 export interface ImportSummary {

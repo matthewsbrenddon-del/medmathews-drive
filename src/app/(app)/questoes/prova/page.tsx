@@ -10,6 +10,7 @@ import { LoadingState } from "@/components/LoadingState";
 import { useQuestionStore } from "@/lib/questionStore";
 import { useQuestionProgressStore } from "@/lib/questionProgressStore";
 import { useStudyStore } from "@/lib/store";
+import { useStudyTimer } from "@/lib/useStudyTimer";
 import { filterQuestions, type QuestionFilters } from "@/lib/questionFilters";
 import { resolveSubject } from "@/lib/subjects";
 import type { Question } from "@/lib/types";
@@ -57,6 +58,7 @@ function ProvaContent() {
   const available = useMemo(() => filterQuestions(questions, filters, progressMap).filter((q) => !q.anulada), [questions]);
 
   const [stage, setStage] = useState<Stage>("setup");
+  useStudyTimer("simulado", stage === "running");
   const [quantidade, setQuantidade] = useState(Math.min(10, available.length || 1));
   const [minutos, setMinutos] = useState(Math.max(5, Math.round(Math.min(10, available.length || 1) * 1.5)));
   const [exam, setExam] = useState<Question[]>([]);

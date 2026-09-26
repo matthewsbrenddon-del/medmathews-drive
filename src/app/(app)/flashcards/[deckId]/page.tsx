@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { downloadAnkiExport, downloadCsvExport } from "@/lib/ankiExport";
 import { useFlashcardStore } from "@/lib/flashcardStore";
 import { useFlashcardProgressStore, getDueCards } from "@/lib/flashcardProgressStore";
+import { useStudyTimer } from "@/lib/useStudyTimer";
 import { cn } from "@/lib/utils";
 
 const TABS = [
@@ -116,6 +117,7 @@ function ReviewRunner({
   const [index, setIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [sessionDone, setSessionDone] = useState(0);
+  useStudyTimer("flashcards", due.length > 0 && index < due.length);
 
   if (deckCards.length === 0) {
     return <EmptyState icon={Layers} title="Este deck ainda não tem cartões." description="Adicione cartões na aba Cartões." />;

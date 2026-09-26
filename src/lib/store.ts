@@ -22,8 +22,10 @@ interface StudyStoreState {
   onboarded: boolean;
   userStates: Record<string, ContentProgress>;
   studyDates: string[];
+  studentName: string;
 
   completeOnboarding: () => void;
+  setStudentName: (name: string) => void;
 
   getFileState: (fileId: string) => ContentProgress;
   toggleFavorite: (fileId: string) => void;
@@ -44,8 +46,10 @@ export const useStudyStore = create<StudyStoreState>()(
       onboarded: false,
       userStates: {},
       studyDates: [],
+      studentName: "",
 
       completeOnboarding: () => set({ onboarded: true }),
+      setStudentName: (name) => set({ studentName: name }),
 
       getFileState: (fileId) => get().userStates[fileId] ?? emptyState(fileId),
 

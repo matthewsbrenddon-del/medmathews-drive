@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import {
+  BookMarked,
   BookOpen,
   Brain,
   Calendar,
@@ -8,6 +9,7 @@ import {
   Layers,
   Search,
   Settings,
+  Sparkles,
   Star,
   Video,
   TrendingUp,
@@ -28,7 +30,9 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/videoaulas", label: "Videoaulas", icon: Video, group: "Conteúdo" },
   { href: "/materiais", label: "Apostilas e Materiais", icon: BookOpen, group: "Conteúdo" },
   { href: "/questoes", label: "Questões", icon: Brain, mobile: true, group: "Prática" },
+  { href: "/quizzes", label: "Quizzes com IA", icon: Sparkles, group: "Prática" },
   { href: "/flashcards", label: "Flashcards", icon: Layers, group: "Prática" },
+  { href: "/cadernos", label: "Meus Cadernos", icon: BookMarked, group: "Prática" },
   { href: "/cronograma", label: "Cronograma", icon: Calendar, group: "Planejamento" },
   { href: "/progresso", label: "Meu Progresso", icon: TrendingUp, mobile: true, group: "Planejamento" },
   { href: "/busca", label: "Busca", icon: Search, mobile: true, group: "Geral" },

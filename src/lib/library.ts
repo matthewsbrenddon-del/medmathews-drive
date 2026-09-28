@@ -62,13 +62,6 @@ export function fileEmbedUrl(file: LibraryFile): string {
   return drivePreviewUrl(file.id);
 }
 
-export interface LibraryFolderNode {
-  type: "folder";
-  name: string;
-  path: string[];
-  fileCount: number;
-}
-
 export interface LibraryFileNode {
   type: "file";
   name: string;
@@ -77,89 +70,159 @@ export interface LibraryFileNode {
   kind: LibraryFileKind;
 }
 
-export type LibraryNode = LibraryFolderNode | LibraryFileNode;
-
-/** Lista as pastas e arquivos diretamente dentro de `prefix` (raiz = []),
- * agrupando por próximo segmento do caminho — computado sob demanda a
- * partir da lista plana, sem manter uma árvore aninhada em memória. */
-export function listChildren(files: LibraryFile[], prefix: string[]): LibraryNode[] {
-  const folders = new Map<string, number>();
-  const fileNodes: LibraryFileNode[] = [];
-
-  for (const file of files) {
-    const path = fullPath(file);
-    if (path.length <= prefix.length) continue;
-    let matches = true;
-    for (let i = 0; i < prefix.length; i++) {
-      if (path[i] !== prefix[i]) {
-        matches = false;
-        break;
-      }
-    }
-    if (!matches) continue;
-
-    const next = path[prefix.length];
-    const isLeaf = path.length === prefix.length + 1;
-    if (isLeaf) {
-      fileNodes.push({ type: "file", name: next, path, file, kind: fileKind(file) });
-    } else {
-      folders.set(next, (folders.get(next) ?? 0) + 1);
-    }
-  }
-
-  const folderNodes: LibraryFolderNode[] = Array.from(folders.entries()).map(([name, fileCount]) => ({
-    type: "folder",
-    name,
-    path: [...prefix, name],
-    fileCount,
-  }));
-
-  folderNodes.sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
-  fileNodes.sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
-
-  return [...folderNodes, ...fileNodes];
-}
-
 export const UNCLASSIFIED_LABEL = "A classificar";
 
-/** Navegação em árvore pela classificação clínica (Grande Área → Disciplina
- * → arquivo), em vez do caminho por curso/pastas de `listChildren`. Itens
- * sem `subjectSlug` (não classificados) ficam agrupados sob "A classificar",
- * um nível abaixo por curso de origem (para não virar uma lista única de
- * milhares de itens). */
-export function listChildrenByGrandeArea(items: ClassifiedFile[], prefix: string[]): LibraryNode[] {
-  if (prefix.length === 0) {
-    const counts = new Map<string, number>();
-    for (const item of items) {
-      const key = item.subjectSlug ? resolveSubject(item.subjectSlug).name : UNCLASSIFIED_LABEL;
-      counts.set(key, (counts.get(key) ?? 0) + 1);
+/** Ordenação "natural" (2.mp4 antes de 10.mp4) — essencial para aulas numeradas. */
+export function naturalCompare(a: string, b: string): number {
+  return a.localeCompare(b, "pt-BR", { numeric: true, sensitivity: "base" });
+}
+
+/** Miniatura pública do Drive (só aparece para arquivos compartilhados por link). */
+export function fileThumbnailUrl(file: LibraryFile, width = 400): string {
+  return `https://drive.google.com/thumbnail?id=${file.id}&sz=w${width}`;
+}
+
+export function isFileComplete(file: LibraryFile, state?: ContentProgress): boolean {
+  return isLibraryItemComplete(fileKind(file), state);
+}
+
+export function isFileStarted(file: LibraryFile, state?: ContentProgress): boolean {
+  if (!state) return false;
+  return Boolean(state.lastViewedAt) || state.watchStatus === "em_andamento" || state.readStatus === "acessado";
+}
+
+export type LibraryView = "area" | "curso";
+
+export interface LibraryTreeNode {
+  key: string;
+  name: string;
+  path: string[];
+  children: LibraryTreeNode[];
+  /** Arquivos diretamente neste nível (não inclui os das subpastas). */
+  files: ClassifiedFile[];
+  /** Total de arquivos nesta pasta e em todas as subpastas. */
+  total: number;
+  videos: number;
+}
+
+export function nodeKey(path: string[]): string {
+  return path.join("\u0001");
+}
+
+/** Caminho de pastas de um arquivo em cada visão — a mesma lista de arquivos,
+ * duas árvores diferentes. */
+export function treePathFor(file: ClassifiedFile, view: LibraryView): string[] {
+  const folders = fullPath(file).slice(0, -1);
+  if (view === "curso") return folders;
+  if (!file.subjectSlug) return [UNCLASSIFIED_LABEL, ...folders];
+  return [resolveSubject(file.subjectSlug).name, file.disciplina || "Geral", file.curso];
+}
+
+export function buildLibraryTree(items: ClassifiedFile[], view: LibraryView): LibraryTreeNode {
+  const root: LibraryTreeNode = { key: "", name: "", path: [], children: [], files: [], total: 0, videos: 0 };
+  const index = new Map<string, LibraryTreeNode>([["", root]]);
+
+  for (const item of items) {
+    const path = treePathFor(item, view);
+    let parent = root;
+    for (let depth = 0; depth < path.length; depth++) {
+      const sub = path.slice(0, depth + 1);
+      const key = nodeKey(sub);
+      let node = index.get(key);
+      if (!node) {
+        node = { key, name: path[depth], path: sub, children: [], files: [], total: 0, videos: 0 };
+        index.set(key, node);
+        parent.children.push(node);
+      }
+      parent = node;
     }
-    const order = [...KNOWN_SUBJECTS.map((s) => s.name), UNCLASSIFIED_LABEL];
-    return order
-      .filter((name) => counts.has(name))
-      .map((name) => ({ type: "folder" as const, name, path: [name], fileCount: counts.get(name)! }));
+    parent.files.push(item);
   }
 
-  const grandeAreaName = prefix[0];
-  const isUnclassifiedBucket = grandeAreaName === UNCLASSIFIED_LABEL;
-  const scoped = items.filter((item) =>
-    isUnclassifiedBucket ? !item.subjectSlug : item.subjectSlug && resolveSubject(item.subjectSlug).name === grandeAreaName
-  );
-  const groupOf = (item: ClassifiedFile) => (isUnclassifiedBucket ? item.curso : item.disciplina || "Outros");
-
-  if (prefix.length === 1) {
-    const counts = new Map<string, number>();
-    for (const item of scoped) counts.set(groupOf(item), (counts.get(groupOf(item)) ?? 0) + 1);
-    return Array.from(counts.entries())
-      .sort((a, b) => a[0].localeCompare(b[0], "pt-BR"))
-      .map(([name, fileCount]) => ({ type: "folder" as const, name, path: [...prefix, name], fileCount }));
+  const subjectOrder = [...KNOWN_SUBJECTS.map((s) => s.name), UNCLASSIFIED_LABEL];
+  function finalize(node: LibraryTreeNode) {
+    node.files.sort((a, b) => naturalCompare(fileName(a), fileName(b)));
+    if (node === root && view === "area") {
+      node.children.sort((a, b) => subjectOrder.indexOf(a.name) - subjectOrder.indexOf(b.name));
+    } else {
+      node.children.sort((a, b) => naturalCompare(a.name, b.name));
+    }
+    node.total = node.files.length;
+    node.videos = node.files.filter((f) => fileKind(f) === "video").length;
+    for (const child of node.children) {
+      finalize(child);
+      node.total += child.total;
+      node.videos += child.videos;
+    }
   }
+  finalize(root);
+  return root;
+}
 
-  const groupName = prefix[1];
-  return scoped
-    .filter((item) => groupOf(item) === groupName)
-    .map((item) => ({ type: "file" as const, name: fileName(item), path: [...prefix, fileName(item)], file: item, kind: fileKind(item) }))
-    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+export function findTreeNode(root: LibraryTreeNode, path: string[]): LibraryTreeNode | undefined {
+  let node: LibraryTreeNode | undefined = root;
+  for (const segment of path) {
+    node = node.children.find((c) => c.name === segment);
+    if (!node) return undefined;
+  }
+  return node;
+}
+
+/** Todos os arquivos de uma pasta e subpastas, na ordem de leitura da árvore. */
+export function collectTreeFiles(node: LibraryTreeNode): ClassifiedFile[] {
+  const out: ClassifiedFile[] = [...node.files];
+  for (const child of node.children) out.push(...collectTreeFiles(child));
+  return out;
+}
+
+export interface NodeProgress {
+  done: number;
+  started: number;
+}
+
+/** Progresso agregado de cada pasta (chave = nodeKey), numa única passada. */
+export function computeTreeProgress(root: LibraryTreeNode, userStates: Record<string, ContentProgress>): Map<string, NodeProgress> {
+  const map = new Map<string, NodeProgress>();
+  function walk(node: LibraryTreeNode): NodeProgress {
+    const acc: NodeProgress = { done: 0, started: 0 };
+    for (const f of node.files) {
+      const state = userStates[f.id];
+      if (isFileComplete(f, state)) acc.done++;
+      else if (isFileStarted(f, state)) acc.started++;
+    }
+    for (const child of node.children) {
+      const p = walk(child);
+      acc.done += p.done;
+      acc.started += p.started;
+    }
+    map.set(node.key, acc);
+    return acc;
+  }
+  walk(root);
+  return map;
+}
+
+/** "Comece por aqui": continua o último item aberto e não concluído desta
+ * pasta; senão, o primeiro vídeo ainda não concluído (ou qualquer arquivo). */
+export function pickStartHere(
+  node: LibraryTreeNode,
+  userStates: Record<string, ContentProgress>
+): { file: ClassifiedFile; reason: "continuar" | "proximo" } | undefined {
+  const files = collectTreeFiles(node);
+  let recent: ClassifiedFile | undefined;
+  let recentAt = "";
+  for (const f of files) {
+    const state = userStates[f.id];
+    if (state?.lastViewedAt && !isFileComplete(f, state) && state.lastViewedAt > recentAt) {
+      recent = f;
+      recentAt = state.lastViewedAt;
+    }
+  }
+  if (recent) return { file: recent, reason: "continuar" };
+  const next =
+    files.find((f) => fileKind(f) === "video" && !isFileComplete(f, userStates[f.id])) ??
+    files.find((f) => !isFileComplete(f, userStates[f.id]));
+  return next ? { file: next, reason: "proximo" } : undefined;
 }
 
 function isLibraryItemComplete(kind: LibraryFileKind, state?: ContentProgress): boolean {

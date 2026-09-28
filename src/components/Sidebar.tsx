@@ -4,9 +4,8 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Flame } from "lucide-react";
-import { NAV_GROUPS } from "@/lib/nav";
+import { NAV_GROUPS, isNavActive } from "@/lib/nav";
 import { cn } from "@/lib/utils";
-import { useContent } from "@/lib/content";
 import { useContentStore } from "@/lib/contentStore";
 import { useStudyStore } from "@/lib/store";
 import { useQuestionProgressStore } from "@/lib/questionProgressStore";
@@ -14,7 +13,6 @@ import { useNotebookStore } from "@/lib/notebookStore";
 import { useLibraryStore } from "@/lib/libraryStore";
 import { useClassificationStore } from "@/lib/classificationStore";
 import { classifyLibrary } from "@/lib/classification";
-import { computeOverallProgress } from "@/lib/progress";
 import { Logo } from "./Logo";
 import { ThemeToggle } from "./ThemeToggle";
 
@@ -29,11 +27,13 @@ export function Sidebar() {
   const pathname = usePathname();
   const hasImported = useContentStore((s) => s.hasImported);
 
-  const content = useContent();
   const userStates = useStudyStore((s) => s.userStates);
   const studentName = useStudyStore((s) => s.studentName);
   const streak = useStudyStore((s) => s.currentStreak());
-  const overall = useMemo(() => computeOverallProgress(content, userStates), [content, userStates]);
+  const completedCount = useMemo(
+    () => Object.values(userStates).filter((s) => s.watchStatus === "assistida" || s.readStatus === "estudado").length,
+    [userStates]
+  );
 
   const questionFavoritesCount = useQuestionProgressStore(
     (s) => Object.values(s.progress).filter((p) => p.favorite).length
@@ -53,7 +53,7 @@ export function Sidebar() {
 
   const badges: Record<string, number> = {
     "/disciplinas": unclassifiedCount,
-    "/cadernos": notebooksCount,
+    "/listas": notebooksCount,
     "/favoritos": contentFavoritesCount + questionFavoritesCount,
   };
 
@@ -85,7 +85,7 @@ export function Sidebar() {
               <Flame size={11} className={streak > 0 ? "fill-warning" : ""} />
               {streak}
             </span>
-            <span className="text-[11px] font-metric text-muted-foreground">{overall.percent}% concluído</span>
+            <span className="text-[11px] font-metric text-muted-foreground">{completedCount} concluído{completedCount === 1 ? "" : "s"}</span>
           </div>
         </div>
       </Link>
@@ -98,7 +98,7 @@ export function Sidebar() {
             </p>
             <div className="space-y-1">
               {group.items.map((item) => {
-                const active = pathname === item.href || pathname?.startsWith(item.href + "/");
+                const active = isNavActive(pathname, item.href);
                 const Icon = item.icon;
                 const badge = badges[item.href] ?? 0;
                 return (

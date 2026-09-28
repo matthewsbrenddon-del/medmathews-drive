@@ -167,7 +167,7 @@ export interface FlashcardProgress {
 }
 
 // ---------------------------------------------------------------------------
-// Cadernos — coleções nomeadas de questões, criadas livremente pelo usuário
+// Listas — coleções nomeadas de questões, criadas livremente pelo usuário
 // (independente de disciplina/tema), tipo uma pasta de revisão pessoal.
 // ---------------------------------------------------------------------------
 
@@ -220,4 +220,30 @@ export interface ImportSummary {
 export interface ImportRowError {
   row: number;
   message: string;
+}
+
+// ---------------------------------------------------------------------------
+// Caderno — bloco de notas livre do próprio usuário (texto em markdown leve).
+// Diferente das "Listas" (coleções de questões) e das Observações das
+// planilhas (metadado da fonte): aqui é 100% conteúdo escrito pelo aluno.
+// Referências de origem ficam DENTRO do texto, como um link
+// `[via Questão #12 — Cardiologia](origem:questao:<id>)` — o usuário pode
+// apagar a referência como qualquer outro trecho, nada fica travado.
+// ---------------------------------------------------------------------------
+
+export type NoteOriginType = "questao" | "aula" | "material" | "livre";
+
+export interface NoteOrigin {
+  tipo: NoteOriginType;
+  id: string;
+  /** Rótulo legível, ex.: "Questão #245 — Cardiologia". */
+  label: string;
+}
+
+export interface Caderno {
+  id: string;
+  titulo: string;
+  conteudo: string;
+  criadoEm: string;
+  atualizadoEm: string;
 }

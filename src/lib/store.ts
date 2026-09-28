@@ -32,6 +32,8 @@ interface StudyStoreState {
   setWatchStatus: (fileId: string, status: WatchStatus) => void;
   setPlaybackProgress: (fileId: string, positionSeconds: number, durationSeconds: number) => void;
   setReadStatus: (fileId: string, status: ReadStatus) => void;
+  /** Registra que o arquivo foi aberto (sem rebaixar um item já concluído). */
+  markOpened: (fileId: string, isVideo: boolean) => void;
   recordStudyToday: () => void;
   currentStreak: () => number;
 }
@@ -113,6 +115,21 @@ export const useStudyStore = create<StudyStoreState>()(
               },
             },
           };
+        }),
+
+      markOpened: (fileId, isVideo) =>
+        set((s) => {
+          const current = s.userStates[fileId] ?? emptyState(fileId);
+          const next: ContentProgress = { ...current, lastViewedAt: new Date().toISOString() };
+          if (isVideo && !current.watchStatus) {
+            next.watchStatus = "em_andamento";
+            next.progressPercent = Math.max(current.progressPercent, 10);
+          }
+          if (!isVideo && !current.readStatus) {
+            next.readStatus = "acessado";
+            next.progressPercent = Math.max(current.progressPercent, 50);
+          }
+          return { userStates: { ...s.userStates, [fileId]: next } };
         }),
 
       recordStudyToday: () =>

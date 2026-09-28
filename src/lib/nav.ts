@@ -1,6 +1,8 @@
 import type { LucideIcon } from "lucide-react";
 import {
-  BookMarked,
+  ListChecks,
+  NotebookPen,
+  Timer,
   BookOpen,
   Brain,
   Calendar,
@@ -26,13 +28,15 @@ export interface NavItem {
 
 export const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: Home, mobile: true, group: "Principal" },
+  { href: "/caderno", label: "Caderno", icon: NotebookPen, group: "Principal" },
   { href: "/disciplinas", label: "Disciplinas", icon: LayoutGrid, mobile: true, group: "Conteúdo" },
   { href: "/videoaulas", label: "Videoaulas", icon: Video, group: "Conteúdo" },
   { href: "/materiais", label: "Apostilas e Materiais", icon: BookOpen, group: "Conteúdo" },
   { href: "/questoes", label: "Questões", icon: Brain, mobile: true, group: "Prática" },
   { href: "/quizzes", label: "Quizzes com IA", icon: Sparkles, group: "Prática" },
   { href: "/flashcards", label: "Flashcards", icon: Layers, group: "Prática" },
-  { href: "/cadernos", label: "Meus Cadernos", icon: BookMarked, group: "Prática" },
+  { href: "/questoes/prova", label: "Simulado", icon: Timer, group: "Prática" },
+  { href: "/listas", label: "Minhas Listas", icon: ListChecks, group: "Prática" },
   { href: "/cronograma", label: "Cronograma", icon: Calendar, group: "Planejamento" },
   { href: "/progresso", label: "Meu Progresso", icon: TrendingUp, mobile: true, group: "Planejamento" },
   { href: "/busca", label: "Busca", icon: Search, mobile: true, group: "Geral" },
@@ -55,3 +59,12 @@ export const NAV_GROUPS: NavGroup[] = NAV_ITEMS.reduce<NavGroup[]>((groups, item
   group.items.push(item);
   return groups;
 }, []);
+
+/** Item ativo = o href mais específico que casa com a rota (ex.: em
+ * /questoes/prova, "Simulado" fica ativo e "Questões" não). */
+export function isNavActive(pathname: string | null, href: string): boolean {
+  if (!pathname) return false;
+  const matches = (h: string) => pathname === h || pathname.startsWith(h + "/");
+  if (!matches(href)) return false;
+  return !NAV_ITEMS.some((item) => item.href !== href && item.href.length > href.length && matches(item.href));
+}

@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { BookmarkPlus, Check, Plus } from "lucide-react";
+import { ListPlus, Check, Plus } from "lucide-react";
 import { useNotebookStore } from "@/lib/notebookStore";
 import { cn } from "@/lib/utils";
 
-/** Popover simples para adicionar/remover uma questão de um ou mais cadernos —
- * cria um caderno novo na hora, se preciso. */
+/** Popover simples para adicionar/remover uma questão de uma ou mais listas —
+ * cria uma lista nova na hora, se preciso. */
 export function NotebookPicker({ questionId }: { questionId: string }) {
   const [open, setOpen] = useState(false);
   const [newName, setNewName] = useState("");
@@ -36,18 +36,18 @@ export function NotebookPicker({ questionId }: { questionId: string }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        aria-label="Adicionar a um caderno"
-        title="Adicionar a um caderno"
+        aria-label="Adicionar a uma lista"
+        title="Adicionar a uma lista"
         className={cn("inline-flex items-center justify-center h-8 w-8 rounded-full hover:bg-surface-hover", inAnyNotebook ? "text-accent" : "text-muted-foreground")}
       >
-        <BookmarkPlus size={16} />
+        <ListPlus size={16} />
       </button>
 
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div className="absolute right-0 top-full mt-1 z-50 w-64 rounded-xl border border-border bg-surface shadow-lift p-2 animate-fade-in">
-            <p className="text-xs font-medium text-muted-foreground px-2 py-1">Adicionar a um caderno</p>
+            <p className="text-xs font-medium text-muted-foreground px-2 py-1">Adicionar a uma lista</p>
             <div className="max-h-40 overflow-y-auto flex flex-col">
               {notebooks.map((n) => {
                 const checked = (entries[n.id] ?? []).includes(questionId);
@@ -65,7 +65,7 @@ export function NotebookPicker({ questionId }: { questionId: string }) {
                   </button>
                 );
               })}
-              {notebooks.length === 0 && <p className="text-xs text-muted-foreground px-2 py-1.5">Nenhum caderno ainda.</p>}
+              {notebooks.length === 0 && <p className="text-xs text-muted-foreground px-2 py-1.5">Nenhuma lista ainda.</p>}
             </div>
             <div className="flex items-center gap-1.5 mt-1.5 pt-1.5 border-t border-border/60">
               <input
@@ -73,7 +73,7 @@ export function NotebookPicker({ questionId }: { questionId: string }) {
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-                placeholder="Novo caderno..."
+                placeholder="Nova lista..."
                 className="input text-xs py-1.5 flex-1"
               />
               <button type="button" onClick={handleCreate} disabled={!newName.trim()} className="btn-primary btn-sm shrink-0">

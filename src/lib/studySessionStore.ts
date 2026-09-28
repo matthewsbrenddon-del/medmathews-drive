@@ -75,7 +75,7 @@ export function sumDurationSecondsInRange(sessions: StudySession[], startIso: st
 }
 
 export const STUDY_KIND_LABELS: Record<StudySession["kind"], string> = {
-  estudo: "Questões (Banco/Cadernos)",
+  estudo: "Questões (Banco/Listas)",
   simulado: "Simulado",
   flashcards: "Flashcards",
   quiz: "Quizzes com IA",

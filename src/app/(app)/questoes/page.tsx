@@ -2,7 +2,23 @@
 
 import { Suspense, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Brain, ClipboardList, Filter, RotateCcw, Search as SearchIcon, Sparkles, Tag } from "lucide-react";
+import {
+  Bookmark,
+  Brain,
+  ClipboardList,
+  Eye,
+  EyeOff,
+  Filter,
+  RotateCcw,
+  Save,
+  Search as SearchIcon,
+  Sparkles,
+  Tag,
+  X,
+  Zap,
+} from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { useSavedFilterStore } from "@/lib/savedFilterStore";
 import { EmptyState } from "@/components/EmptyState";
 import { EmptySearchIllustration } from "@/components/Illustrations";
 import { LoadingState } from "@/components/LoadingState";
@@ -11,7 +27,15 @@ import { useQuestionStore } from "@/lib/questionStore";
 import { useQuestionProgressStore } from "@/lib/questionProgressStore";
 import { needsReview } from "@/lib/questionProgressStore";
 import {
+  ORDER_LABELS,
+  STATUS_TABS,
+  describeFilters,
   filterQuestions,
+  filtersToParams,
+  paramsToFilters,
+  removeFilterChip,
+  sortQuestions,
+  type QuestionOrder,
   getDistinctBancas,
   getDistinctSubtemas,
   getDistinctTags,
@@ -20,7 +44,7 @@ import {
   type QuestionFilters,
 } from "@/lib/questionFilters";
 import { getRecommendedTemas } from "@/lib/questionStats";
-import { getSubjectsFromItems } from "@/lib/subjects";
+import { getSubjectsFromItems, resolveSubject } from "@/lib/subjects";
 import { cn } from "@/lib/utils";
 
 function QuestoesContent() {
@@ -33,8 +57,20 @@ function QuestoesContent() {
   // Mecânica de filtro em painel (inspirada no QConcursos): os campos ficam
   // num rascunho local e só valem depois de "Filtrar" — "Limpar" zera os
   // dois de uma vez. A busca por texto abaixo do painel continua instantânea.
-  const [draftFilters, setDraftFilters] = useState<QuestionFilters>({});
-  const [filters, setFilters] = useState<QuestionFilters>({});
+  const [filters, setFilters] = useState<QuestionFilters>(() => {
+    const initial = paramsToFilters(new URLSearchParams(searchParams.toString()));
+    delete initial.q;
+    return initial;
+  });
+  const [draftFilters, setDraftFilters] = useState<QuestionFilters>(filters);
+  const [hideChips, setHideChips] = useState(false);
+  const [savingName, setSavingName] = useState<string | null>(null);
+  const [activeSavedId, setActiveSavedId] = useState<string | null>(null);
+  const [previewLimit, setPreviewLimit] = useState(30);
+  const saved = useSavedFilterStore((s) => s.saved);
+  const saveFilter = useSavedFilterStore((s) => s.saveFilter);
+  const updateSaved = useSavedFilterStore((s) => s.updateFilter);
+  const deleteSaved = useSavedFilterStore((s) => s.deleteFilter);
 
   const subjects = useMemo(() => getSubjectsFromItems(questions), [questions]);
   const bancas = useMemo(() => getDistinctBancas(questions), [questions]);
@@ -49,9 +85,39 @@ function QuestoesContent() {
   const recommendations = useMemo(() => getRecommendedTemas(questions, progressMap), [questions, progressMap]);
 
   const results = useMemo(
-    () => filterQuestions(questions, { ...filters, q: query }, progressMap),
+    () => sortQuestions(filterQuestions(questions, { ...filters, q: query }, progressMap), filters.ordem, progressMap),
     [questions, filters, query, progressMap]
   );
+  const chips = describeFilters({ ...filters, q: query || undefined }, (slug) => resolveSubject(slug).name);
+  const activeSaved = saved.find((f) => f.id === activeSavedId);
+  const savedChanged = activeSaved ? JSON.stringify(activeSaved.filters) !== JSON.stringify(filters) : false;
+
+  /** Aplica na hora (abas "Minhas questões", ordenar, excluir anuladas, chips) — mantém o rascunho do painel em sincronia. */
+  function applyNow(next: QuestionFilters) {
+    setFilters(next);
+    setDraftFilters(next);
+  }
+
+  function removeChip(key: Parameters<typeof removeFilterChip>[1]) {
+    if (key === "q") {
+      setQuery("");
+      return;
+    }
+    applyNow(removeFilterChip(filters, key));
+  }
+
+  function loadSaved(id: string) {
+    const item = saved.find((f) => f.id === id);
+    if (!item) return;
+    setActiveSavedId(id);
+    applyNow(item.filters);
+  }
+
+  function relampago(f: QuestionFilters, nome?: string) {
+    const extra: Record<string, string> = { limite: "20", seed: String(Date.now() % 1_000_000_000) };
+    if (nome) extra.titulo = `⚡ ${nome}`;
+    router.push(`/questoes/estudo?${filtersToParams(f, extra)}`);
+  }
 
   const reviewCount = useMemo(
     () => questions.filter((q) => progressMap[q.id] && needsReview(progressMap[q.id])).length,
@@ -76,18 +142,7 @@ function QuestoesContent() {
   }
 
   function buildQuery(extra?: Record<string, string>) {
-    const params = new URLSearchParams();
-    if (query) params.set("q", query);
-    if (filters.disciplina && filters.disciplina !== "todas") params.set("disciplina", filters.disciplina);
-    if (filters.tema && filters.tema !== "todos") params.set("tema", filters.tema);
-    if (filters.subtema && filters.subtema !== "todos") params.set("subtema", filters.subtema);
-    if (filters.tags && filters.tags.length > 0) params.set("tags", filters.tags.join(","));
-    if (filters.banca && filters.banca !== "todas") params.set("banca", filters.banca);
-    if (filters.ano && filters.ano !== "todos") params.set("ano", filters.ano);
-    if (filters.dificuldade && filters.dificuldade !== "todas") params.set("dificuldade", filters.dificuldade);
-    if (filters.status && filters.status !== "todos") params.set("status", filters.status);
-    if (extra) for (const [k, v] of Object.entries(extra)) params.set(k, v);
-    return params.toString();
+    return filtersToParams({ ...filters, q: query || undefined }, extra);
   }
 
   function trainTema(rec: { subjectSlug: string; tema: string }) {
@@ -96,10 +151,176 @@ function QuestoesContent() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground">Banco de Questões</h1>
-        <p className="text-muted-foreground mt-1">Pratique com questões de residência médica, no seu ritmo.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold text-foreground">Banco de Questões</h1>
+          <p className="text-muted-foreground mt-1">
+            Encontramos <strong className="text-foreground font-metric">{results.length}</strong>{" "}
+            {results.length === 1 ? "questão" : "questões"}
+            {chips.length > 0 ? " com os filtros aplicados" : " no seu banco"}.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+        </div>
       </div>
+
+      <section className="card p-4 flex flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-2 justify-between">
+          <div className="flex flex-wrap rounded-xl border border-border p-0.5 bg-muted/60" role="tablist" aria-label="Minhas questões">
+            {STATUS_TABS.map((t) => {
+              const active = (filters.status ?? "todos") === t.id;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => applyNow({ ...filters, status: t.id === "todos" ? undefined : t.id })}
+                  className={cn(
+                    "px-3 py-1.5 text-xs font-medium rounded-lg transition-colors",
+                    active ? "bg-surface shadow-card text-foreground" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="inline-flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={Boolean(filters.excluirAnuladas)}
+                onChange={(e) => applyNow({ ...filters, excluirAnuladas: e.target.checked || undefined })}
+                className="accent-[hsl(var(--primary))]"
+              />
+              Excluir anuladas
+            </label>
+            <select
+              aria-label="Ordenar"
+              value={filters.ordem ?? "padrao"}
+              onChange={(e) => applyNow({ ...filters, ordem: e.target.value === "padrao" ? undefined : (e.target.value as QuestionOrder) })}
+              className="input w-auto py-1.5 text-xs"
+            >
+              {(Object.keys(ORDER_LABELS) as QuestionOrder[]).map((o) => (
+                <option key={o} value={o}>
+                  Ordenar: {ORDER_LABELS[o]}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {chips.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {!hideChips &&
+              chips.map((c) => (
+                <span
+                  key={String(c.key)}
+                  className="inline-flex items-center gap-1 rounded-full bg-primary-light text-primary text-xs font-medium pl-2.5 pr-1 py-0.5"
+                >
+                  {c.label}
+                  <button
+                    type="button"
+                    onClick={() => removeChip(c.key)}
+                    aria-label={`Remover filtro ${c.label}`}
+                    className="h-4 w-4 inline-flex items-center justify-center rounded-full hover:bg-primary/20"
+                  >
+                    <X size={10} />
+                  </button>
+                </span>
+              ))}
+            <button
+              type="button"
+              onClick={() => setHideChips((v) => !v)}
+              className="text-[11px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1 ml-1"
+            >
+              {hideChips ? <Eye size={12} /> : <EyeOff size={12} />}
+              {hideChips ? `Mostrar ${chips.length} filtros aplicados` : "Esconder filtros aplicados"}
+            </button>
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center gap-1.5 border-t border-border/60 pt-3">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mr-1 inline-flex items-center gap-1">
+            <Bookmark size={12} /> Filtros salvos
+          </span>
+          {saved.length === 0 && savingName === null && (
+            <span className="text-xs text-muted-foreground">Nenhum ainda — monte um filtro e salve para reabrir com um clique.</span>
+          )}
+          {saved.map((f) => (
+            <span
+              key={f.id}
+              className={cn(
+                "inline-flex items-center rounded-full border text-xs overflow-hidden",
+                activeSavedId === f.id ? "border-primary bg-primary-light" : "border-border"
+              )}
+            >
+              <button type="button" onClick={() => loadSaved(f.id)} className="px-2.5 py-1 font-medium text-foreground hover:bg-surface-hover">
+                {f.nome}
+              </button>
+              <button
+                type="button"
+                onClick={() => relampago(f.filters, f.nome)}
+                title="Simulado relâmpago: 20 questões deste filtro"
+                className="px-1.5 py-1 text-warning hover:bg-warning/10 border-l border-border"
+              >
+                <Zap size={12} />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  deleteSaved(f.id);
+                  if (activeSavedId === f.id) setActiveSavedId(null);
+                }}
+                aria-label={`Excluir filtro ${f.nome}`}
+                className="px-1.5 py-1 text-muted-foreground hover:text-danger border-l border-border"
+              >
+                <X size={11} />
+              </button>
+            </span>
+          ))}
+          {activeSaved && savedChanged && (
+            <button type="button" onClick={() => updateSaved(activeSaved.id, filters)} className="btn-outline btn-sm">
+              <Save size={12} /> Atualizar “{activeSaved.nome}”
+            </button>
+          )}
+          {savingName === null ? (
+            <button type="button" onClick={() => setSavingName("")} className="btn-ghost btn-sm text-primary" disabled={chips.length === 0}>
+              <Save size={12} /> Salvar filtro atual
+            </button>
+          ) : (
+            <span className="inline-flex items-center gap-1.5">
+              <input
+                autoFocus
+                value={savingName}
+                onChange={(e) => setSavingName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && savingName.trim()) {
+                    setActiveSavedId(saveFilter(savingName, filters).id);
+                    setSavingName(null);
+                  }
+                  if (e.key === "Escape") setSavingName(null);
+                }}
+                placeholder="Ex.: Cardio — só as que errei"
+                className="input py-1 text-xs w-52"
+              />
+              <button
+                type="button"
+                className="btn-primary btn-sm"
+                disabled={!savingName.trim()}
+                onClick={() => {
+                  setActiveSavedId(saveFilter(savingName, filters).id);
+                  setSavingName(null);
+                }}
+              >
+                Salvar
+              </button>
+            </span>
+          )}
+        </div>
+      </section>
 
       {recommendations.length > 0 && (
         <section>
@@ -132,7 +353,7 @@ function QuestoesContent() {
 
       <section className="card p-5 flex flex-col gap-4">
         <h2 className="text-sm font-semibold text-foreground inline-flex items-center gap-1.5">
-          <Filter size={14} className="text-muted-foreground" /> Monte sua sessão personalizada
+          <Filter size={14} className="text-muted-foreground" /> Filtros detalhados
         </h2>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -224,17 +445,6 @@ function QuestoesContent() {
             ))}
           </select>
 
-          <select
-            aria-label="Filtrar por status"
-            className="input text-sm"
-            value={draftFilters.status ?? "todos"}
-            onChange={(e) => setDraftFilters((f) => ({ ...f, status: e.target.value }))}
-          >
-            <option value="todos">Feitas ou não — todas</option>
-            <option value="nao_respondida">Ainda não feitas</option>
-            <option value="acertada">Já acertadas</option>
-            <option value="errada">Já erradas</option>
-          </select>
         </div>
 
         {allTags.length > 0 && (
@@ -277,11 +487,25 @@ function QuestoesContent() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-border/60">
-          <button type="button" className="btn-primary" onClick={() => router.push(`/questoes/estudo?${buildQuery()}`)}>
-            <Brain size={15} /> Iniciar sessão personalizada
+          <button
+            type="button"
+            className="btn-primary"
+            disabled={results.length === 0}
+            onClick={() => router.push(`/questoes/estudo?${buildQuery()}`)}
+          >
+            <Brain size={15} /> Resolver {results.length} {results.length === 1 ? "questão" : "questões"}
+          </button>
+          <button
+            type="button"
+            className="btn-outline"
+            disabled={results.length === 0}
+            onClick={() => relampago({ ...filters, q: query || undefined })}
+            title="20 questões sorteadas destes filtros"
+          >
+            <Zap size={15} className="text-warning" /> Relâmpago (20)
           </button>
           <button type="button" className="btn-outline" onClick={() => router.push(`/questoes/prova?${buildQuery()}`)}>
-            <ClipboardList size={15} /> Modo Prova com esses filtros
+            <ClipboardList size={15} /> Simulado cronometrado
           </button>
           <button
             type="button"
@@ -315,13 +539,18 @@ function QuestoesContent() {
         />
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {results.map((question) => (
+          {results.slice(0, previewLimit).map((question) => (
             <QuestionCard
               key={question.id}
               question={question}
               onClick={() => router.push(`/questoes/estudo?${buildQuery({ start: question.id })}`)}
             />
           ))}
+          {results.length > previewLimit && (
+            <button type="button" className="btn-outline sm:col-span-2 lg:col-span-3 justify-self-center" onClick={() => setPreviewLimit((l) => l + 30)}>
+              Mostrar mais ({results.length - previewLimit} restantes)
+            </button>
+          )}
         </div>
       )}
     </div>

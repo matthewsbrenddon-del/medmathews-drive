@@ -288,3 +288,36 @@ export function searchFiles(files: LibraryFile[], query: string, limit = 150): L
   }
   return results;
 }
+
+const RELATED_STOPWORDS = new Set([
+  "para", "como", "entre", "sobre", "sendo", "outros", "outras", "geral", "gerais", "doenca", "doencas", "sindrome", "sindromes", "aula", "parte",
+]);
+
+function relatedTokens(text: string): string[] {
+  return normalizeText(text)
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w.length >= 4 && !RELATED_STOPWORDS.has(w));
+}
+
+/** Aulas do acervo relacionadas a uma questão: mesma grande área e palavras do
+ * tema/subtema presentes no caminho do arquivo (disciplina, pastas, nome). */
+export function findRelatedLessons(
+  items: ClassifiedFile[],
+  question: { subjectSlug: string; tema?: string; subtema?: string },
+  limit = 3
+): ClassifiedFile[] {
+  const tokens = Array.from(new Set(relatedTokens(`${question.tema ?? ""} ${question.subtema ?? ""}`)));
+  if (tokens.length === 0) return [];
+  const scored: { file: ClassifiedFile; score: number }[] = [];
+  for (const file of items) {
+    if (fileKind(file) !== "video") continue;
+    const haystack = normalizeText(`${file.disciplina ?? ""} ${file.subtema ?? ""} ${file.area} ${file.conteudo}`);
+    let hits = 0;
+    for (const t of tokens) if (haystack.includes(t)) hits++;
+    if (hits === 0) continue;
+    const score = hits * 2 + (file.subjectSlug === question.subjectSlug ? 3 : 0);
+    scored.push({ file, score });
+  }
+  scored.sort((a, b) => b.score - a.score || naturalCompare(fileName(a.file), fileName(b.file)));
+  return scored.slice(0, limit).map((s) => s.file);
+}

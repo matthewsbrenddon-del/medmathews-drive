@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Brain, Clock, Filter, Flame, Layers, Target, Video as VideoIcon, BookOpen as BookOpenIcon, X } from "lucide-react";
 import { ProgressBar } from "@/components/ProgressBar";
 import { ProgressCircle } from "@/components/ProgressCircle";
 import { SubjectIcon } from "@/components/SubjectIcon";
-import { useContent } from "@/lib/content";
-import { computeOverallProgress, computeSubjectProgress } from "@/lib/progress";
+import { useLibraryStore } from "@/lib/libraryStore";
+import { useClassificationStore } from "@/lib/classificationStore";
+import { classifyLibrary } from "@/lib/classification";
+import { computeSubjectProgressFromLibrary, fileKind, isFileComplete } from "@/lib/library";
 import { useStudyStore } from "@/lib/store";
 import { useQuestionStore } from "@/lib/questionStore";
 import { useQuestionProgressStore } from "@/lib/questionProgressStore";
@@ -151,15 +153,40 @@ function StudyTimeSection() {
 }
 
 export default function ProgressoPage() {
-  const content = useContent();
+  const libraryFiles = useLibraryStore((s) => s.files);
+  const hydrateLibrary = useLibraryStore((s) => s.hydrate);
+  const overrides = useClassificationStore((s) => s.overrides);
   const userStates = useStudyStore((s) => s.userStates);
   const currentStreak = useStudyStore((s) => s.currentStreak());
   const questions = useQuestionStore((s) => s.questions);
   const questionProgress = useQuestionProgressStore((s) => s.progress);
 
-  const overall = computeOverallProgress(content, userStates);
-  const subjects = computeSubjectProgress(content, userStates);
-  const remaining = content.length - overall.watchedLessons - overall.studiedMaterials;
+  useEffect(() => {
+    hydrateLibrary();
+  }, [hydrateLibrary]);
+  const classified = useMemo(() => classifyLibrary(libraryFiles, overrides), [libraryFiles, overrides]);
+  const subjects = useMemo(() => computeSubjectProgressFromLibrary(classified, userStates), [classified, userStates]);
+  const overall = useMemo(() => {
+    let totalLessons = 0,
+      watchedLessons = 0,
+      totalMaterials = 0,
+      studiedMaterials = 0;
+    for (const f of classified) {
+      const done = isFileComplete(f, userStates[f.id]);
+      if (fileKind(f) === "video") {
+        totalLessons++;
+        if (done) watchedLessons++;
+      } else {
+        totalMaterials++;
+        if (done) studiedMaterials++;
+      }
+    }
+    const total = totalLessons + totalMaterials;
+    const doneAll = watchedLessons + studiedMaterials;
+    const percent = total > 0 ? Math.round((doneAll / total) * 1000) / 10 : 0;
+    return { totalLessons, watchedLessons, totalMaterials, studiedMaterials, percent };
+  }, [classified, userStates]);
+  const remaining = overall.totalLessons + overall.totalMaterials - overall.watchedLessons - overall.studiedMaterials;
 
   const [questionFilters, setQuestionFilters] = useState<QuestionFilters>({});
   const questionSubjects = useMemo(() => getSubjectsFromItems(questions), [questions]);

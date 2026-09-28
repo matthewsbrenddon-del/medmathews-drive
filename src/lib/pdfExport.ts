@@ -39,7 +39,12 @@ function ensureSpace(doc: jsPDF, cursor: Cursor, needed: number) {
   }
 }
 
-function writeParagraph(doc: jsPDF, cursor: Cursor, text: string, opts: { fontSize: number; bold?: boolean; color?: [number, number, number]; indent?: number; lineHeight?: number }) {
+function writeParagraph(
+  doc: jsPDF,
+  cursor: Cursor,
+  text: string,
+  opts: { fontSize: number; bold?: boolean; color?: [number, number, number]; indent?: number; lineHeight?: number },
+) {
   const { fontSize, bold = false, color = TEXT, indent = 0, lineHeight = fontSize * 0.42 } = opts;
   doc.setFont("helvetica", bold ? "bold" : "normal");
   doc.setFontSize(fontSize);
@@ -58,8 +63,12 @@ function writeParagraph(doc: jsPDF, cursor: Cursor, text: string, opts: { fontSi
  * a PDF_EXPORT_MAX questões por chamada — o chamador deve fatiar a lista e
  * repetir a exportação a partir do ponto onde parou, se precisar de mais.
  */
-export function exportQuestionsToPdf(questions: Question[], options: { studentName?: string; offset?: number }): void {
+export function exportQuestionsToPdf(
+  questions: Question[],
+  options: { studentName?: string; offset?: number; includeGabarito?: boolean },
+): void {
   const offset = options.offset ?? 0;
+  const includeGabarito = options.includeGabarito ?? true;
   const batch = questions.slice(0, PDF_EXPORT_MAX);
   if (batch.length === 0) return;
 
@@ -98,11 +107,13 @@ export function exportQuestionsToPdf(questions: Question[], options: { studentNa
   doc.setTextColor(...MUTED);
   doc.text(
     doc.splitTextToSize(
-      "Gerado automaticamente a partir dos filtros aplicados na plataforma. O gabarito comentado está no final deste documento.",
-      CONTENT_WIDTH
+      includeGabarito
+        ? "Gerado automaticamente a partir dos filtros aplicados na plataforma. O gabarito está no final deste documento."
+        : "Versão para simular prova — sem gabarito. Gerada a partir dos filtros aplicados na plataforma.",
+      CONTENT_WIDTH,
     ),
     MARGIN,
-    infoY + 6
+    infoY + 6,
   );
 
   doc.addPage();
@@ -116,7 +127,7 @@ export function exportQuestionsToPdf(questions: Question[], options: { studentNa
     cursor.y += i === 0 ? 0 : 4;
 
     const headerParts = [question.subjectName, question.banca, question.ano ? String(question.ano) : undefined].filter(
-      (part): part is string => Boolean(part)
+      (part): part is string => Boolean(part),
     );
     writeParagraph(doc, cursor, `Questão ${numero}${headerParts.length ? " · " + headerParts.join(" · ") : ""}`, {
       fontSize: 10,
@@ -145,31 +156,33 @@ export function exportQuestionsToPdf(questions: Question[], options: { studentNa
   });
 
   // Gabarito
-  doc.addPage();
-  cursor.y = MARGIN;
-  writeParagraph(doc, cursor, "Gabarito", { fontSize: 16, bold: true, color: PRIMARY });
-  cursor.y += 4;
+  if (includeGabarito) {
+    doc.addPage();
+    cursor.y = MARGIN;
+    writeParagraph(doc, cursor, "Gabarito", { fontSize: 16, bold: true, color: PRIMARY });
+    cursor.y += 4;
 
-  const colWidth = CONTENT_WIDTH / 5;
-  let col = 0;
-  const rowStartY = cursor.y;
-  let rowY = rowStartY;
-  gabaritoEntries.forEach((entry, i) => {
-    if (i > 0 && i % 5 === 0) {
-      rowY += 7;
-      col = 0;
-      if (rowY > PAGE_HEIGHT - 22) {
-        doc.addPage();
-        rowY = MARGIN;
+    const colWidth = CONTENT_WIDTH / 5;
+    let col = 0;
+    const rowStartY = cursor.y;
+    let rowY = rowStartY;
+    gabaritoEntries.forEach((entry, i) => {
+      if (i > 0 && i % 5 === 0) {
+        rowY += 7;
+        col = 0;
+        if (rowY > PAGE_HEIGHT - 22) {
+          doc.addPage();
+          rowY = MARGIN;
+        }
       }
-    }
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.setTextColor(...TEXT);
-    const label = entry.anulada ? `${entry.numero}. Anulada` : `${entry.numero}. ${entry.letra}`;
-    doc.text(label, MARGIN + col * colWidth, rowY);
-    col += 1;
-  });
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.setTextColor(...TEXT);
+      const label = entry.anulada ? `${entry.numero}. Anulada` : `${entry.numero}. ${entry.letra}`;
+      doc.text(label, MARGIN + col * colWidth, rowY);
+      col += 1;
+    });
+  }
 
   const totalPages = doc.getNumberOfPages();
   for (let p = 1; p <= totalPages; p += 1) {
@@ -178,5 +191,5 @@ export function exportQuestionsToPdf(questions: Question[], options: { studentNa
     addFooter(doc, p, totalPages);
   }
 
-  doc.save(`medstudy-hub-questoes-${offset + 1}-${offset + batch.length}.pdf`);
+  doc.save(`medstudy-hub-questoes-${offset + 1}-${offset + batch.length}${includeGabarito ? "" : "-sem-gabarito"}.pdf`);
 }

@@ -63,13 +63,29 @@ Três recursos adicionais — nunca substitutivos — usam a API da Claude quand
 
 A chave nunca é exposta no navegador — toda chamada à API da Claude acontece em `src/app/api/ai/*` (server-side), via `src/lib/ai/anthropicClient.ts`.
 
-## Práticas: Quizzes, Simulado, Cadernos, grifo e exportação em PDF
+## Caderno (bloco de notas)
 
-A área de prática (Questões, Quizzes, Flashcards, Simulado e Cadernos, agrupados sob "Prática" na barra lateral) compartilha um único motor de bateria de questões (`src/components/QuestionBattery.tsx`), usado tanto no Banco de Questões (`/questoes/estudo`) quanto nos Cadernos pessoais (`/cadernos/[id]`):
+**Caderno** (`/caderno`) é um bloco de notas livre do próprio aluno — vários cadernos, markdown leve (títulos, **negrito**, *itálico*, `==grifo==`, listas, checklists, citações), barra de formatação, visão lado a lado e salvamento automático (~1,2 s após parar de digitar, com indicador "Salvando…/Salvo"). O botão **Anotar** no player de aulas/materiais e na tela de questões abre um painel lateral com o último caderno usado, anexando uma referência clicável de volta à origem (`via Questão 12 — Cardiologia`), que o aluno pode remover. Cada caderno é um texto único (`src/lib/cadernoStore.ts`); a referência é só um link markdown `origem:<tipo>:<id>` dentro do texto (`src/lib/markdown.tsx`, renderizado sem HTML cru).
+
+As antigas coleções de questões chamadas "Cadernos" agora se chamam **Minhas Listas** (`/listas`).
+
+## Tela de questões
+
+`/questoes` mostra "Encontramos X questões", abas **Todas / Não resolvidas / Resolvidas / Acertei / Errei / Marcadas** (pelo histórico do próprio aluno), "Excluir anuladas", ordenação (recentes, grande área, dificuldade, nunca respondidas primeiro), chips removíveis dos filtros aplicados, **filtros salvos** com nome e **⚡ simulado relâmpago** (20 questões sorteadas de um filtro, com ordem fixa por `seed` na URL). O campo "desatualizada" não existe na planilha de questões atual, por isso não há filtro para ele.
+
+Resolvendo (`/questoes/estudo`, `src/components/QuestionBattery.tsx`): cabeçalho "Questão 3 de 47" com breadcrumb banca/ano › grande área › tema › subtema, alternativas em círculos com estados de certo/errado e tesoura para eliminar alternativas, aviso quando a questão tem imagem ainda não extraída, e a linha de ações **Gabarito comentado** (ponto de "não lido"), **Minhas anotações** (trechos do Caderno ligados à questão), **Estatísticas** (histórico do aluno) e **Aulas relacionadas** (até 3 videoaulas do acervo que casam com a grande área e o tema). Barra flutuante: modo foco, desempenho da sessão, cronômetro (sessão e questão), tamanho do texto e preferências (revelar gabarito ao clicar, avançar automaticamente). Atalhos: **A–E/1–5** escolhe, **Enter** responde, **→/Espaço** próxima, **←** anterior, **?** ajuda. Ao voltar para a mesma lista, oferece "Continuar de onde parei".
+
+## Acesso às videoaulas
+
+Todas as entradas — Disciplinas (as duas visões), Videoaulas, Apostilas e Materiais, Dashboard, Busca, Favoritos e Aulas relacionadas — abrem o mesmo player (`FilePreviewModal`) com o embed `https://drive.google.com/file/d/{ID}/preview` do acervo real, com Anterior/Próxima na mesma pasta. Para o vídeo tocar, cada arquivo precisa estar compartilhado no Drive como "Qualquer pessoa com o link". Disciplinas tem árvore expansível com progresso por nível e o card **Comece por aqui / Continue de onde parou**, e lembra a pasta aberta entre visitas.
+
+## Práticas: Quizzes, Simulado, Listas, grifo e exportação em PDF
+
+A área de prática (Questões, Quizzes, Flashcards, Simulado e Minhas Listas, agrupados sob "Prática" na barra lateral) compartilha um único motor de bateria de questões (`src/components/QuestionBattery.tsx`), usado tanto no Banco de Questões (`/questoes/estudo`) quanto nas Listas pessoais (`/listas/[id]`):
 
 - **Grifo de texto**: selecione qualquer trecho do enunciado ou de uma alternativa com o mouse para marcá-lo em uma de 4 cores fixas (amarelo/rosa/verde/ciano), legíveis tanto no tema claro quanto no escuro. Os grifos são persistidos por questão em `src/lib/highlightStore.ts`, indexados por offset de texto (não pela posição no DOM), então sobrevivem a re-renderizações.
 - **Foco**: botão flutuante que alterna entre o feed contínuo (todas as questões da bateria, rolável) e um modo carrossel (uma questão por vez, com Anterior/Próxima).
-- **Por questão**: favoritar (★), adicionar a um ou mais **Cadernos** pessoais (`src/lib/notebookStore.ts` — coleções nomeadas de questões, sem depender de disciplina/tema) e minimizar (colapsa para uma linha).
+- **Por questão**: favoritar (★), adicionar a uma ou mais **Listas** pessoais (`src/lib/notebookStore.ts` — coleções nomeadas de questões, sem depender de disciplina/tema) e minimizar (colapsa para uma linha).
 - **Exportação em PDF** (`src/lib/pdfExport.ts`, via `jspdf`): exporta a bateria filtrada atual em um PDF formatado, com marca d'água da plataforma em todas as páginas, nome do aluno (definido em **Configurações → Seu nome**) e data na capa, e gabarito comentado ao final. Limitada a 100 questões por exportação — para exportar o restante, informe "a partir da questão" no topo da bateria (ou navegue até lá em modo Foco) e exporte novamente a partir dali.
 - **Cronômetro de sessão** (`src/lib/useStudyTimer.ts` + `src/lib/studySessionStore.ts`): mede automaticamente o tempo líquido gasto em cada sessão de Questões/Simulado/Flashcards (sessões residuais de menos de 3s não contam) e alimenta o painel **Horas líquidas de estudo** em **Meu Progresso**, filtrável por 24h/7 dias/mensal/anual/período selecionável, com detalhamento por tipo de sessão.
 

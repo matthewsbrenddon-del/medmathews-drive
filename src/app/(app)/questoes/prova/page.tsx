@@ -11,7 +11,7 @@ import { useQuestionStore } from "@/lib/questionStore";
 import { useQuestionProgressStore } from "@/lib/questionProgressStore";
 import { useStudyStore } from "@/lib/store";
 import { useStudyTimer } from "@/lib/useStudyTimer";
-import { filterQuestions, type QuestionFilters } from "@/lib/questionFilters";
+import { filterQuestions, paramsToFilters, type QuestionFilters } from "@/lib/questionFilters";
 import { resolveSubject } from "@/lib/subjects";
 import type { Question } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -40,17 +40,8 @@ function ProvaContent() {
   const answerQuestion = useQuestionProgressStore((s) => s.answerQuestion);
   const recordStudyToday = useStudyStore((s) => s.recordStudyToday);
 
-  const tagsParam = searchParams.get("tags");
-  const filters: QuestionFilters = {
-    disciplina: searchParams.get("disciplina") ?? undefined,
-    tema: searchParams.get("tema") ?? undefined,
-    subtema: searchParams.get("subtema") ?? undefined,
-    tags: tagsParam ? tagsParam.split(",") : undefined,
-    banca: searchParams.get("banca") ?? undefined,
-    ano: searchParams.get("ano") ?? undefined,
-    dificuldade: searchParams.get("dificuldade") ?? undefined,
-    status: searchParams.get("status") ?? undefined,
-  };
+  const filters: QuestionFilters = paramsToFilters(new URLSearchParams(searchParams.toString()));
+
 
   // Questões anuladas (sem gabarito único) ficam de fora do Modo Prova — não há
   // como pontuá-las com segurança num bloco cronometrado/avaliado.

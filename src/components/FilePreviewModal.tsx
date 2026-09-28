@@ -69,7 +69,8 @@ export function FilePreviewModal({
   useEffect(() => {
     if (!file) return;
     markOpened(file.id, fileKind(file) === "video");
-  }, [file, markOpened]);
+    recordStudyToday();
+  }, [file, markOpened, recordStudyToday]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {

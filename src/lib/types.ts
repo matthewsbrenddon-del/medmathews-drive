@@ -125,6 +125,8 @@ export interface QuestionProgress {
   /** Acertos seguidos mais recentes — sai da fila de revisão ao chegar em 2. */
   correctStreak: number;
   favorite: boolean;
+  /** Marcada pelo aluno para revisar depois (ícone de alvo na tela de questões). */
+  marked?: boolean;
   lastAnsweredAt?: string;
   history: { answeredAt: string; selected: string; correct: boolean }[];
 }

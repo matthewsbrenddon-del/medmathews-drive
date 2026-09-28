@@ -17,6 +17,7 @@ interface QuestionProgressState {
   getProgress: (questionId: string) => QuestionProgress;
   answerQuestion: (questionId: string, selected: string, correctLetter: string) => boolean;
   toggleFavorite: (questionId: string) => void;
+  toggleMarked: (questionId: string) => void;
   resetAll: () => void;
 }
 
@@ -57,6 +58,12 @@ export const useQuestionProgressStore = create<QuestionProgressState>()(
         set((s) => {
           const current = s.progress[questionId] ?? empty(questionId);
           return { progress: { ...s.progress, [questionId]: { ...current, favorite: !current.favorite } } };
+        }),
+
+      toggleMarked: (questionId) =>
+        set((s) => {
+          const current = s.progress[questionId] ?? empty(questionId);
+          return { progress: { ...s.progress, [questionId]: { ...current, marked: !current.marked } } };
         }),
 
       resetAll: () => set({ progress: {} }),

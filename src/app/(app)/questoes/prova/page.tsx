@@ -7,7 +7,7 @@ import { AlertTriangle, Check, ClipboardList, Clock, X } from "lucide-react";
 import { ConfirmationModal } from "@/components/ConfirmationModal";
 import { EmptyState } from "@/components/EmptyState";
 import { LoadingState } from "@/components/LoadingState";
-import { useQuestionStore } from "@/lib/questionStore";
+import { useQuestionStore, useQuestionsReady } from "@/lib/questionStore";
 import { useQuestionProgressStore } from "@/lib/questionProgressStore";
 import { useStudyStore } from "@/lib/store";
 import { useStudyTimer } from "@/lib/useStudyTimer";
@@ -36,6 +36,7 @@ type Stage = "setup" | "running" | "results";
 function ProvaContent() {
   const searchParams = useSearchParams();
   const questions = useQuestionStore((s) => s.questions);
+  const ready = useQuestionsReady();
   const progressMap = useQuestionProgressStore((s) => s.progress);
   const answerQuestion = useQuestionProgressStore((s) => s.answerQuestion);
   const recordStudyToday = useStudyStore((s) => s.recordStudyToday);
@@ -50,8 +51,17 @@ function ProvaContent() {
 
   const [stage, setStage] = useState<Stage>("setup");
   useStudyTimer("simulado", stage === "running");
-  const [quantidade, setQuantidade] = useState(Math.min(10, available.length || 1));
-  const [minutos, setMinutos] = useState(Math.max(5, Math.round(Math.min(10, available.length || 1) * 1.5)));
+  const limiteParam = Number(searchParams.get("limite")) || 10;
+  const [quantidade, setQuantidade] = useState(10);
+  const [minutos, setMinutos] = useState(15);
+  const initializedRef = useRef(false);
+  useEffect(() => {
+    if (initializedRef.current || available.length === 0) return;
+    initializedRef.current = true;
+    const n = Math.min(limiteParam, available.length);
+    setQuantidade(n);
+    setMinutos(Math.max(5, Math.round(n * 3)));
+  }, [available.length, limiteParam]);
   const [exam, setExam] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [current, setCurrent] = useState(0);
@@ -87,6 +97,8 @@ function ProvaContent() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage]);
+
+  if (!ready) return <LoadingState label="Carregando o banco de questões..." />;
 
   if (available.length === 0) {
     return (

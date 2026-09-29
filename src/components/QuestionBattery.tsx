@@ -44,7 +44,7 @@ import { FONT_SCALES, usePracticePrefsStore } from "@/lib/practicePrefsStore";
 import { useQuestionProgressStore } from "@/lib/questionProgressStore";
 import { useStudyStore } from "@/lib/store";
 import { useStudyTimer } from "@/lib/useStudyTimer";
-import { exportQuestionsToPdf, PDF_EXPORT_MAX } from "@/lib/pdfExport";
+import { ApostilaExportModal } from "./ApostilaExportModal";
 import { resolveSubject } from "@/lib/subjects";
 import { cn } from "@/lib/utils";
 import { reflowText } from "@/lib/reflowText";
@@ -189,12 +189,18 @@ function QuestionItem({
   const scissorsMode = usePracticePrefsStore((s) => s.scissorsMode);
   const enunciado = useMemo(() => reflowText(question.enunciado), [question.enunciado]);
 
+  const origemLabel = question.banca
+    ? [question.banca, question.ano].filter(Boolean).join(" ")
+    : question.colecao?.startsWith("Coletânea")
+      ? "Coletânea"
+      : question.colecao;
   const breadcrumb = [
-    [question.banca, question.ano].filter(Boolean).join(" "),
-    question.subjectName,
-    question.tema,
-    question.subtema,
-  ].filter((p): p is string => Boolean(p && String(p).trim()));
+    { label: origemLabel, area: false },
+    { label: question.subjectName, area: true },
+    { label: question.especialidade && question.especialidade !== question.subjectName ? question.especialidade : undefined, area: false },
+    { label: question.tema, area: false },
+    { label: question.subtema, area: false },
+  ].filter((p): p is { label: string; area: boolean } => Boolean(p.label && String(p.label).trim()));
 
   if (minimized) {
     return (
@@ -248,7 +254,7 @@ function QuestionItem({
               Questão <span className="font-metric">{index + 1}</span>{" "}
               <span className="text-muted-foreground font-normal">de {total}</span>
             </span>
-            <PriorityBadge priority={question.dificuldade} />
+            {question.dificuldade > 0 && <PriorityBadge priority={question.dificuldade} />}
             {question.anulada && (
               <span className="rounded-full bg-warning/15 text-warning text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5">
                 Anulada
@@ -263,15 +269,20 @@ function QuestionItem({
               <span key={i} className="inline-flex items-center gap-1 min-w-0">
                 {i > 0 && <ChevronRight size={11} className="shrink-0 opacity-60" />}
                 <span
-                  className={cn("truncate max-w-[220px]", i === 1 && "font-medium")}
-                  style={i === 1 ? { color: `hsl(${subject.colorToken})` } : undefined}
-                  title={part}
+                  className={cn("truncate max-w-[220px]", part.area && "font-medium")}
+                  style={part.area ? { color: `hsl(${subject.colorToken})` } : undefined}
+                  title={part.label}
                 >
-                  {part}
+                  {part.label}
                 </span>
               </span>
             ))}
           </nav>
+          {question.secao && (
+            <p className="text-[11px] uppercase tracking-[0.08em] font-semibold text-accent/80 line-clamp-1" title={question.secao}>
+              § {question.secao}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-0.5 shrink-0">
           <button
@@ -320,8 +331,17 @@ function QuestionItem({
         <p className="text-xs text-warning bg-warning/10 rounded-lg px-3 py-2 inline-flex items-start gap-2">
           <ImageOff size={14} className="shrink-0 mt-0.5" />
           <span>
-            Esta questão tem imagem na prova original que ainda não está disponível na plataforma
-            {question.banca ? ` — consulte a prova ${question.banca}${question.ano ? ` ${question.ano}` : ""}` : ""}.
+            Esta questão tem {question.imagemTipo && !question.imagemTipo.startsWith("Imagem/") ? question.imagemTipo.toLowerCase() : "imagem"} na prova
+            original que ainda não está disponível na plataforma
+            {question.prova ? ` — consulte “${question.prova}”` : ""}.
+            {question.fonteUrl && (
+              <>
+                {" "}
+                <a href={question.fonteUrl} target="_blank" rel="noopener noreferrer" className="underline font-medium">
+                  Abrir a fonte original
+                </a>
+              </>
+            )}
           </span>
         </p>
       )}
@@ -557,19 +577,25 @@ function QuestionItem({
 
 /** Bateria de questões: feed contínuo (padrão) ou modo Foco (uma por vez),
  * com barra de ferramentas flutuante, atalhos de teclado e posição salva. */
+const RENDER_BATCH = 25;
+
 export function QuestionBattery({
   questions,
   kind,
   listKey,
+  exportTitle,
+  exportSubtitle,
 }: {
   questions: Question[];
   kind: StudySession["kind"];
   /** Identifica a lista (ex.: filtros da URL) para retomar de onde parou. */
   listKey?: string;
+  /** Título/subtítulo da capa da apostila em PDF. */
+  exportTitle?: string;
+  exportSubtitle?: string;
 }) {
   const answerQuestion = useQuestionProgressStore((s) => s.answerQuestion);
   const recordStudyToday = useStudyStore((s) => s.recordStudyToday);
-  const studentName = useStudyStore((s) => s.studentName);
   const streak = useStudyStore((s) => s.currentStreak());
 
   const fontScaleIndex = usePracticePrefsStore((s) => s.fontScaleIndex);
@@ -595,8 +621,7 @@ export function QuestionBattery({
   const [focusMode, setFocusMode] = useState(false);
   const [current, setCurrent] = useState(0);
   const [panel, setPanel] = useState<"stats" | "font" | "config" | "keys" | "mark" | null>(null);
-  const [exportStart, setExportStart] = useState(1);
-  const [withGabarito, setWithGabarito] = useState(true);
+  const [exportOpen, setExportOpen] = useState(false);
   const [preview, setPreview] = useState<{ file: LibraryFile; playlist: LibraryFile[] } | null>(null);
   const [resumeIndex] = useState(() => {
     if (!savedPositionId) return -1;
@@ -604,6 +629,9 @@ export function QuestionBattery({
     return i > 0 ? i : -1;
   });
   const [resumeDismissed, setResumeDismissed] = useState(false);
+  // Sessões grandes (centenas de questões) renderizam em lotes conforme a rolagem.
+  const [renderCount, setRenderCount] = useState(RENDER_BATCH);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   const [now, setNow] = useState(() => Date.now());
   const sessionStartRef = useRef(Date.now());
@@ -662,17 +690,34 @@ export function QuestionBattery({
     };
   }, [focusMode, questions.length]);
 
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || focusMode) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) setRenderCount((n) => Math.min(questions.length, n + RENDER_BATCH));
+      },
+      { rootMargin: "1200px 0px" }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [focusMode, questions.length, renderCount]);
+
   const goTo = useCallback(
     (index: number) => {
       const target = Math.max(0, Math.min(questions.length - 1, index));
       setCurrent(target);
       if (!focusMode) {
         scrollingToRef.current = target;
-        refs.current[target]?.scrollIntoView({ behavior: "smooth", block: "start" });
-        setTimeout(() => (scrollingToRef.current = null), 700);
+        const scroll = () => refs.current[target]?.scrollIntoView({ behavior: "smooth", block: "start" });
+        if (target >= renderCount) {
+          setRenderCount(Math.min(questions.length, target + RENDER_BATCH));
+          requestAnimationFrame(() => requestAnimationFrame(scroll));
+        } else scroll();
+        setTimeout(() => (scrollingToRef.current = null), 900);
       }
     },
-    [focusMode, questions.length]
+    [focusMode, questions.length, renderCount]
   );
 
   const submit = useCallback(
@@ -748,8 +793,6 @@ export function QuestionBattery({
   if (questions.length === 0) return null;
 
   const fontScale = FONT_SCALES[fontScaleIndex];
-  const clampedStart = Math.min(Math.max(exportStart, 1), questions.length);
-  const exportCount = Math.min(PDF_EXPORT_MAX, questions.length - (clampedStart - 1));
   const sessionSeconds = Math.max(0, Math.floor((now - sessionStartRef.current) / 1000));
   const questionSeconds = Math.max(0, Math.floor((now - questionStartRef.current) / 1000));
 
@@ -801,41 +844,18 @@ export function QuestionBattery({
           </span>
           {streak > 0 && <span className="text-warning">🔥 {streak}d</span>}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {questions.length > PDF_EXPORT_MAX && (
-            <label className="text-xs text-muted-foreground inline-flex items-center gap-1.5">
-              A partir da
-              <input
-                type="number"
-                min={1}
-                max={questions.length}
-                value={exportStart}
-                onChange={(e) => setExportStart(Number(e.target.value) || 1)}
-                className="input w-16 py-1 text-xs"
-                aria-label="Exportar a partir da questão número"
-              />
-            </label>
-          )}
-          <label className="text-xs text-muted-foreground inline-flex items-center gap-1.5 cursor-pointer">
-            <input type="checkbox" checked={withGabarito} onChange={(e) => setWithGabarito(e.target.checked)} className="accent-[hsl(var(--primary))]" />
-            com gabarito
-          </label>
-          <button
-            type="button"
-            className="btn-outline btn-sm"
-            onClick={() =>
-              exportQuestionsToPdf(questions.slice(clampedStart - 1), {
-                studentName,
-                offset: clampedStart - 1,
-                includeGabarito: withGabarito,
-              })
-            }
-            title={`Máximo de ${PDF_EXPORT_MAX} questões por arquivo`}
-          >
-            <FileDown size={13} /> Imprimir / PDF ({clampedStart}–{clampedStart - 1 + exportCount})
-          </button>
-        </div>
+        <button type="button" className="btn-outline btn-sm" onClick={() => setExportOpen(true)} title="Apostila em PDF com estas questões">
+          <FileDown size={13} /> Apostila PDF ({questions.length})
+        </button>
       </div>
+
+      <ApostilaExportModal
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
+        questions={questions}
+        title={exportTitle}
+        subtitle={exportSubtitle}
+      />
 
       {resumeIndex > 0 && !resumeDismissed && (
         <div className="max-w-3xl mx-auto w-full rounded-xl border border-primary/40 bg-primary-light px-4 py-3 flex flex-wrap items-center justify-between gap-3">
@@ -876,7 +896,14 @@ export function QuestionBattery({
           </div>
         </div>
       ) : (
-        <div className="max-w-3xl mx-auto w-full flex flex-col gap-4">{questions.map((q, i) => renderItem(q, i))}</div>
+        <div className="max-w-3xl mx-auto w-full flex flex-col gap-4">
+          {questions.slice(0, renderCount).map((q, i) => renderItem(q, i))}
+          {renderCount < questions.length && (
+            <div ref={sentinelRef} className="card p-4 text-center text-xs text-muted-foreground font-metric">
+              Carregando mais questões… ({renderCount} de {questions.length})
+            </div>
+          )}
+        </div>
       )}
 
       {/* Barra de ferramentas flutuante: vertical à direita no desktop, horizontal no celular. */}

@@ -8,43 +8,50 @@ import {
   ClipboardList,
   Eye,
   EyeOff,
-  Filter,
+  FileDown,
+  ListOrdered,
   RotateCcw,
   Save,
   Search as SearchIcon,
+  Shuffle,
   Sparkles,
-  Tag,
   X,
   Zap,
 } from "lucide-react";
+import { ApostilaExportModal } from "@/components/ApostilaExportModal";
+import { QuestionFacetPanel } from "@/components/QuestionFacetPanel";
+import { useNotebookStore } from "@/lib/notebookStore";
+import { usePracticePrefsStore } from "@/lib/practicePrefsStore";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useSavedFilterStore } from "@/lib/savedFilterStore";
 import { EmptyState } from "@/components/EmptyState";
 import { EmptySearchIllustration } from "@/components/Illustrations";
 import { LoadingState } from "@/components/LoadingState";
 import { QuestionCard } from "@/components/QuestionCard";
-import { useQuestionStore } from "@/lib/questionStore";
+import { useQuestionStore, useQuestionsReady } from "@/lib/questionStore";
 import { useQuestionProgressStore } from "@/lib/questionProgressStore";
 import { needsReview } from "@/lib/questionProgressStore";
 import {
   ORDER_LABELS,
+  SCOPE_LABELS,
   STATUS_TABS,
+  computeFacets,
   describeFilters,
   filterQuestions,
   filtersToParams,
+  hasAnyFilter,
+  normalizeFilters,
   paramsToFilters,
   removeFilterChip,
+  seededShuffle,
   sortQuestions,
-  type QuestionOrder,
-  getDistinctBancas,
-  getDistinctSubtemas,
-  getDistinctTags,
-  getDistinctTemas,
-  getDistinctYears,
   type QuestionFilters,
+  type QuestionOrder,
+  type SearchScope,
 } from "@/lib/questionFilters";
 import { getRecommendedTemas } from "@/lib/questionStats";
-import { getSubjectsFromItems, resolveSubject } from "@/lib/subjects";
+import { resolveSubject } from "@/lib/subjects";
+import type { Question } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 function QuestoesContent() {
@@ -53,13 +60,23 @@ function QuestoesContent() {
   const questions = useQuestionStore((s) => s.questions);
   const progressMap = useQuestionProgressStore((s) => s.progress);
 
+  const ready = useQuestionsReady();
+  const listEntries = useNotebookStore((s) => s.entries);
+  const notebooks = useNotebookStore((s) => s.notebooks);
+  const sessionSize = usePracticePrefsStore((s) => s.sessionSize);
+  const setSessionSize = usePracticePrefsStore((s) => s.setSessionSize);
+  const sessionRandom = usePracticePrefsStore((s) => s.sessionRandom);
+  const setSessionRandom = usePracticePrefsStore((s) => s.setSessionRandom);
+
   const [query, setQuery] = useState(searchParams.get("q") ?? "");
-  // Mecânica de filtro em painel (inspirada no QConcursos): os campos ficam
+  const [escopo, setEscopo] = useState<SearchScope>((searchParams.get("escopo") as SearchScope) || "tudo");
+  // Mecânica de filtro em painel (inspirada no QConcursos): as facetas ficam
   // num rascunho local e só valem depois de "Filtrar" — "Limpar" zera os
-  // dois de uma vez. A busca por texto abaixo do painel continua instantânea.
+  // dois de uma vez. A busca por texto continua instantânea.
   const [filters, setFilters] = useState<QuestionFilters>(() => {
-    const initial = paramsToFilters(new URLSearchParams(searchParams.toString()));
+    const initial = normalizeFilters(paramsToFilters(new URLSearchParams(searchParams.toString())));
     delete initial.q;
+    delete initial.escopo;
     return initial;
   });
   const [draftFilters, setDraftFilters] = useState<QuestionFilters>(filters);
@@ -67,28 +84,42 @@ function QuestoesContent() {
   const [savingName, setSavingName] = useState<string | null>(null);
   const [activeSavedId, setActiveSavedId] = useState<string | null>(null);
   const [previewLimit, setPreviewLimit] = useState(30);
+  const [customSize, setCustomSize] = useState("");
+  const [exportSelection, setExportSelection] = useState<Question[] | null>(null);
   const saved = useSavedFilterStore((s) => s.saved);
   const saveFilter = useSavedFilterStore((s) => s.saveFilter);
   const updateSaved = useSavedFilterStore((s) => s.updateFilter);
   const deleteSaved = useSavedFilterStore((s) => s.deleteFilter);
 
-  const subjects = useMemo(() => getSubjectsFromItems(questions), [questions]);
-  const bancas = useMemo(() => getDistinctBancas(questions), [questions]);
-  const anos = useMemo(() => getDistinctYears(questions), [questions]);
-  const temas = useMemo(() => getDistinctTemas(questions, draftFilters.disciplina), [questions, draftFilters.disciplina]);
-  const subtemas = useMemo(() => getDistinctSubtemas(questions, draftFilters.tema), [questions, draftFilters.tema]);
-  const allTags = useMemo(() => getDistinctTags(questions), [questions]);
+  const liveQuery = useMemo<QuestionFilters>(() => (query.trim() ? { q: query.trim(), escopo } : {}), [query, escopo]);
+  const filterCtx = useMemo(() => ({ listEntries }), [listEntries]);
+  const listName = (id: string) => notebooks.find((n) => n.id === id)?.name ?? "lista removida";
 
-  const hasAppliedFilters = Object.values(filters).some((v) => (Array.isArray(v) ? v.length > 0 : Boolean(v)));
+  const hasAppliedFilters = hasAnyFilter(filters);
   const hasDraftChanges = JSON.stringify(draftFilters) !== JSON.stringify(filters);
+
+  const facets = useMemo(
+    () =>
+      computeFacets(questions, { ...draftFilters, ...liveQuery }, progressMap, filterCtx, {
+        area: (slug) => resolveSubject(slug).name,
+        lista: listName,
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [questions, draftFilters, liveQuery, progressMap, filterCtx, notebooks]
+  );
+  const draftCount = useMemo(
+    () => (hasDraftChanges ? filterQuestions(questions, { ...draftFilters, ...liveQuery }, progressMap, filterCtx).length : 0),
+    [hasDraftChanges, questions, draftFilters, liveQuery, progressMap, filterCtx]
+  );
 
   const recommendations = useMemo(() => getRecommendedTemas(questions, progressMap), [questions, progressMap]);
 
   const results = useMemo(
-    () => sortQuestions(filterQuestions(questions, { ...filters, q: query }, progressMap), filters.ordem, progressMap),
-    [questions, filters, query, progressMap]
+    () => sortQuestions(filterQuestions(questions, { ...filters, ...liveQuery }, progressMap, filterCtx), filters.ordem, progressMap),
+    [questions, filters, liveQuery, progressMap, filterCtx]
   );
-  const chips = describeFilters({ ...filters, q: query || undefined }, (slug) => resolveSubject(slug).name);
+  const chips = describeFilters({ ...filters, ...liveQuery }, (slug) => resolveSubject(slug).name, listName);
+  const selectedCount = sessionSize > 0 ? Math.min(sessionSize, results.length) : results.length;
   const activeSaved = saved.find((f) => f.id === activeSavedId);
   const savedChanged = activeSaved ? JSON.stringify(activeSaved.filters) !== JSON.stringify(filters) : false;
 
@@ -101,6 +132,7 @@ function QuestoesContent() {
   function removeChip(key: Parameters<typeof removeFilterChip>[1]) {
     if (key === "q") {
       setQuery("");
+      setEscopo("tudo");
       return;
     }
     applyNow(removeFilterChip(filters, key));
@@ -110,7 +142,7 @@ function QuestoesContent() {
     const item = saved.find((f) => f.id === id);
     if (!item) return;
     setActiveSavedId(id);
-    applyNow(item.filters);
+    applyNow(normalizeFilters(item.filters));
   }
 
   function relampago(f: QuestionFilters, nome?: string) {
@@ -124,14 +156,6 @@ function QuestoesContent() {
     [questions, progressMap]
   );
 
-  function toggleTag(tag: string) {
-    setDraftFilters((f) => {
-      const current = f.tags ?? [];
-      const next = current.includes(tag) ? current.filter((t) => t !== tag) : [...current, tag];
-      return { ...f, tags: next };
-    });
-  }
-
   function applyFilters() {
     setFilters(draftFilters);
   }
@@ -142,12 +166,29 @@ function QuestoesContent() {
   }
 
   function buildQuery(extra?: Record<string, string>) {
-    return filtersToParams({ ...filters, q: query || undefined }, extra);
+    return filtersToParams({ ...filters, ...liveQuery }, extra);
   }
+
+  /** Parâmetros da sessão escolhida: quantidade + sorteio (mesma semente vira a mesma ordem). */
+  function sessionParams(seed: number): Record<string, string> {
+    const extra: Record<string, string> = {};
+    if (sessionSize > 0 && sessionSize < results.length) extra.limite = String(sessionSize);
+    if (sessionRandom) extra.seed = String(seed);
+    return extra;
+  }
+
+  function selection(seed: number): Question[] {
+    const base = sessionRandom ? seededShuffle(results, seed) : results;
+    return sessionSize > 0 ? base.slice(0, sessionSize) : base;
+  }
+
+  const newSeed = () => (Date.now() % 1_000_000_000) + 1;
 
   function trainTema(rec: { subjectSlug: string; tema: string }) {
     router.push(`/questoes/estudo?disciplina=${rec.subjectSlug}&tema=${encodeURIComponent(rec.tema)}`);
   }
+
+  if (!ready) return <LoadingState label="Carregando o banco de questões..." />;
 
   return (
     <div className="flex flex-col gap-6">
@@ -155,15 +196,59 @@ function QuestoesContent() {
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Banco de Questões</h1>
           <p className="text-muted-foreground mt-1">
-            Encontramos <strong className="text-foreground font-metric">{results.length}</strong>{" "}
+            <strong className="text-foreground font-metric">{results.length.toLocaleString("pt-BR")}</strong>{" "}
             {results.length === 1 ? "questão" : "questões"}
-            {chips.length > 0 ? " com os filtros aplicados" : " no seu banco"}.
+            {chips.length > 0 ? " com os filtros aplicados" : " no seu banco"}
+            {chips.length > 0 && (
+              <span className="font-metric"> · de {questions.length.toLocaleString("pt-BR")}</span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <ThemeToggle />
         </div>
       </div>
+
+      <div className="flex flex-col gap-2">
+        <div className="relative">
+          <SearchIcon size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder='Buscar: termos, "frase exata" ou -excluir (ex.: meningite "líquor turvo" -neonatal)'
+            aria-label="Buscar questões"
+            className="input pl-10 pr-4 py-3"
+          />
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          <span className="text-muted-foreground mr-1">Buscar em:</span>
+          {(Object.keys(SCOPE_LABELS) as SearchScope[]).map((sc) => (
+            <button
+              key={sc}
+              type="button"
+              onClick={() => setEscopo(sc)}
+              className={cn(
+                "rounded-full border px-2.5 py-0.5 transition-colors",
+                escopo === sc ? "border-primary bg-primary-light text-primary font-medium" : "border-border text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {SCOPE_LABELS[sc]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <QuestionFacetPanel
+        draft={draftFilters}
+        onDraftChange={setDraftFilters}
+        facets={facets}
+        draftCount={draftCount}
+        onApply={applyFilters}
+        onClear={clearFilters}
+        hasChanges={hasDraftChanges}
+        canClear={hasAppliedFilters || hasDraftChanges}
+      />
 
       <section className="card p-4 flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-2 justify-between">
@@ -322,6 +407,131 @@ function QuestoesContent() {
         </div>
       </section>
 
+      <section className="card relative overflow-hidden p-5 flex flex-col gap-4">
+        <span aria-hidden className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-primary/10 blur-2xl" />
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold text-foreground inline-flex items-center gap-2">
+              <ListOrdered size={17} className="text-primary" /> Monte sua sessão
+            </h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Quantas questões por vez? Vale para resolver, simulado cronometrado e apostila em PDF.
+            </p>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            <strong className="text-2xl text-foreground font-metric">{selectedCount.toLocaleString("pt-BR")}</strong>
+            <span className="font-metric"> / {results.length.toLocaleString("pt-BR")}</span> questões
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {[10, 20, 30, 50, 100, 200, 0].map((n) => {
+            const active = sessionSize === n;
+            const disabled = n > 0 && n > results.length && results.length > 0 && !active;
+            return (
+              <button
+                key={n}
+                type="button"
+                onClick={() => {
+                  setSessionSize(n);
+                  setCustomSize("");
+                }}
+                disabled={disabled}
+                className={cn(
+                  "min-w-[52px] rounded-xl border px-3 py-2 text-sm font-metric transition-all",
+                  active
+                    ? "border-primary bg-primary text-primary-foreground shadow-card"
+                    : "border-border bg-surface text-foreground hover:border-primary/50 hover:bg-primary-light disabled:opacity-35 disabled:hover:bg-surface"
+                )}
+              >
+                {n === 0 ? "Todas" : n}
+              </button>
+            );
+          })}
+          <label className="inline-flex items-center gap-1.5 rounded-xl border border-dashed border-border px-2.5 py-1.5 text-xs text-muted-foreground focus-within:border-primary">
+            Outra:
+            <input
+              type="number"
+              min={1}
+              max={results.length || undefined}
+              value={customSize || (![10, 20, 30, 50, 100, 200, 0].includes(sessionSize) ? String(sessionSize) : "")}
+              onChange={(e) => {
+                setCustomSize(e.target.value);
+                const n = Number(e.target.value);
+                if (n > 0) setSessionSize(n);
+              }}
+              placeholder="ex.: 45"
+              className="w-16 bg-transparent font-metric text-sm text-foreground outline-none"
+              aria-label="Quantidade personalizada de questões"
+            />
+          </label>
+          <span className="mx-1 hidden sm:block h-6 w-px bg-border" />
+          <div className="inline-flex rounded-xl border border-border p-0.5 bg-muted/60 text-xs">
+            <button
+              type="button"
+              onClick={() => setSessionRandom(false)}
+              className={cn("px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5", !sessionRandom ? "bg-surface shadow-card text-foreground" : "text-muted-foreground")}
+            >
+              <ListOrdered size={13} /> Na ordem
+            </button>
+            <button
+              type="button"
+              onClick={() => setSessionRandom(true)}
+              className={cn("px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5", sessionRandom ? "bg-surface shadow-card text-foreground" : "text-muted-foreground")}
+            >
+              <Shuffle size={13} /> Sorteadas
+            </button>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-border/60">
+          <button
+            type="button"
+            className="btn-primary"
+            disabled={results.length === 0}
+            onClick={() => router.push(`/questoes/estudo?${buildQuery(sessionParams(newSeed()))}`)}
+          >
+            <Brain size={15} /> Resolver {selectedCount} {selectedCount === 1 ? "questão" : "questões"}
+          </button>
+          <button
+            type="button"
+            className="btn-outline"
+            disabled={results.length === 0}
+            onClick={() => router.push(`/questoes/prova?${buildQuery({ ...sessionParams(newSeed()), limite: String(selectedCount) })}`)}
+          >
+            <ClipboardList size={15} /> Simulado cronometrado
+          </button>
+          <button type="button" className="btn-outline" disabled={results.length === 0} onClick={() => setExportSelection(selection(newSeed()))}>
+            <FileDown size={15} className="text-primary" /> Apostila PDF ({selectedCount})
+          </button>
+          <button
+            type="button"
+            className="btn-ghost"
+            disabled={results.length === 0}
+            onClick={() => relampago({ ...filters, ...liveQuery })}
+            title="20 questões sorteadas destes filtros"
+          >
+            <Zap size={15} className="text-warning" /> Relâmpago
+          </button>
+          <button
+            type="button"
+            disabled={reviewCount === 0}
+            className="btn-ghost disabled:opacity-50"
+            onClick={() => router.push(`/questoes/estudo?${buildQuery({ modo: "revisao" })}`)}
+          >
+            <RotateCcw size={15} />
+            {reviewCount > 0 ? `Revisar ${reviewCount} erradas` : "Nada para revisar"}
+          </button>
+        </div>
+      </section>
+
+      <ApostilaExportModal
+        open={exportSelection !== null}
+        onClose={() => setExportSelection(null)}
+        questions={exportSelection ?? []}
+        subtitle={chips.length > 0 ? chips.map((c) => c.label).join(" · ") : "Seleção do banco de questões"}
+      />
+
       {recommendations.length > 0 && (
         <section>
           <h2 className="text-sm font-semibold text-foreground mb-3 inline-flex items-center gap-1.5">
@@ -350,186 +560,6 @@ function QuestoesContent() {
           </div>
         </section>
       )}
-
-      <section className="card p-5 flex flex-col gap-4">
-        <h2 className="text-sm font-semibold text-foreground inline-flex items-center gap-1.5">
-          <Filter size={14} className="text-muted-foreground" /> Filtros detalhados
-        </h2>
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          <select
-            aria-label="Filtrar por disciplina"
-            className="input text-sm"
-            value={draftFilters.disciplina ?? "todas"}
-            onChange={(e) => setDraftFilters((f) => ({ ...f, disciplina: e.target.value, tema: undefined, subtema: undefined }))}
-          >
-            <option value="todas">Todas as disciplinas</option>
-            {subjects.map((s) => (
-              <option key={s.slug} value={s.slug}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-
-          <select
-            aria-label="Filtrar por tema"
-            className="input text-sm"
-            value={draftFilters.tema ?? "todos"}
-            disabled={temas.length === 0}
-            onChange={(e) => setDraftFilters((f) => ({ ...f, tema: e.target.value, subtema: undefined }))}
-          >
-            <option value="todos">Todos os temas</option>
-            {temas.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
-
-          <select
-            aria-label="Filtrar por subtema"
-            className="input text-sm"
-            value={draftFilters.subtema ?? "todos"}
-            disabled={subtemas.length === 0}
-            onChange={(e) => setDraftFilters((f) => ({ ...f, subtema: e.target.value }))}
-          >
-            <option value="todos">Todos os subtemas</option>
-            {subtemas.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
-
-          <select
-            aria-label="Filtrar por banca"
-            className="input text-sm"
-            value={draftFilters.banca ?? "todas"}
-            disabled={bancas.length === 0}
-            onChange={(e) => setDraftFilters((f) => ({ ...f, banca: e.target.value }))}
-          >
-            <option value="todas">Todas as bancas</option>
-            {bancas.map((b) => (
-              <option key={b} value={b}>
-                {b}
-              </option>
-            ))}
-          </select>
-
-          <select
-            aria-label="Filtrar por ano"
-            className="input text-sm"
-            value={draftFilters.ano ?? "todos"}
-            disabled={anos.length === 0}
-            onChange={(e) => setDraftFilters((f) => ({ ...f, ano: e.target.value }))}
-          >
-            <option value="todos">Todos os anos</option>
-            {anos.map((a) => (
-              <option key={a} value={String(a)}>
-                {a}
-              </option>
-            ))}
-          </select>
-
-          <select
-            aria-label="Filtrar por dificuldade"
-            className="input text-sm"
-            value={draftFilters.dificuldade ?? "todas"}
-            onChange={(e) => setDraftFilters((f) => ({ ...f, dificuldade: e.target.value }))}
-          >
-            <option value="todas">Todas as dificuldades</option>
-            {[1, 2, 3, 4, 5].map((d) => (
-              <option key={d} value={String(d)}>
-                Dificuldade {d}
-              </option>
-            ))}
-          </select>
-
-        </div>
-
-        {allTags.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5">
-            <Tag size={13} className="text-muted-foreground mr-0.5" />
-            {allTags.map((tag) => {
-              const active = (draftFilters.tags ?? []).includes(tag);
-              return (
-                <button
-                  key={tag}
-                  type="button"
-                  onClick={() => toggleTag(tag)}
-                  className={cn(
-                    "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
-                    active
-                      ? "border-accent bg-accent/10 text-accent"
-                      : "border-border/60 text-muted-foreground hover:bg-surface-hover"
-                  )}
-                >
-                  {tag}
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <p className="text-xs text-muted-foreground font-metric">
-            {results.length} {results.length === 1 ? "questão encontrada" : "questões encontradas"}
-            {hasAppliedFilters ? " com esses filtros" : ""}
-          </p>
-          <div className="flex items-center gap-2">
-            <button type="button" className="btn-outline btn-sm" onClick={clearFilters} disabled={!hasAppliedFilters && !hasDraftChanges}>
-              Limpar
-            </button>
-            <button type="button" className="btn-primary btn-sm" onClick={applyFilters} disabled={!hasDraftChanges}>
-              <Filter size={13} /> Filtrar
-            </button>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-border/60">
-          <button
-            type="button"
-            className="btn-primary"
-            disabled={results.length === 0}
-            onClick={() => router.push(`/questoes/estudo?${buildQuery()}`)}
-          >
-            <Brain size={15} /> Resolver {results.length} {results.length === 1 ? "questão" : "questões"}
-          </button>
-          <button
-            type="button"
-            className="btn-outline"
-            disabled={results.length === 0}
-            onClick={() => relampago({ ...filters, q: query || undefined })}
-            title="20 questões sorteadas destes filtros"
-          >
-            <Zap size={15} className="text-warning" /> Relâmpago (20)
-          </button>
-          <button type="button" className="btn-outline" onClick={() => router.push(`/questoes/prova?${buildQuery()}`)}>
-            <ClipboardList size={15} /> Simulado cronometrado
-          </button>
-          <button
-            type="button"
-            disabled={reviewCount === 0}
-            className="btn-outline disabled:opacity-50"
-            onClick={() => router.push(`/questoes/estudo?${buildQuery({ modo: "revisao" })}`)}
-          >
-            <RotateCcw size={15} />
-            {reviewCount > 0 ? `Revisar ${reviewCount} erradas` : "Nenhuma questão para revisar"}
-          </button>
-        </div>
-      </section>
-
-      <div className="relative">
-        <SearchIcon size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Buscar por enunciado, tema ou tag..."
-          aria-label="Buscar questões"
-          className="input pl-10"
-        />
-      </div>
 
       {results.length === 0 ? (
         <EmptyState

@@ -8,34 +8,17 @@ import { EmptyState } from "@/components/EmptyState";
 import { EmptySearchIllustration } from "@/components/Illustrations";
 import { LoadingState } from "@/components/LoadingState";
 import { QuestionBattery } from "@/components/QuestionBattery";
-import { useQuestionStore } from "@/lib/questionStore";
+import { useQuestionStore, useQuestionsReady } from "@/lib/questionStore";
 import { useQuestionProgressStore } from "@/lib/questionProgressStore";
-import { describeFilters, filterQuestions, paramsToFilters, sortQuestions } from "@/lib/questionFilters";
+import { describeFilters, filterQuestions, paramsToFilters, seededShuffle, sortQuestions } from "@/lib/questionFilters";
+import { useNotebookStore } from "@/lib/notebookStore";
 import { resolveSubject } from "@/lib/subjects";
-
-/** PRNG determinístico (mulberry32) — o mesmo `seed` na URL gera a mesma ordem,
- * então "continuar de onde parei" funciona também no simulado relâmpago. */
-function seededShuffle<T>(list: T[], seed: number): T[] {
-  let a = seed >>> 0;
-  const rand = () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-  const copy = [...list];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy;
-}
 
 function EstudoContent() {
   const searchParams = useSearchParams();
   const questions = useQuestionStore((s) => s.questions);
   const progressMap = useQuestionProgressStore((s) => s.progress);
+  const ready = useQuestionsReady();
 
   const filters = paramsToFilters(new URLSearchParams(searchParams.toString()));
   const startId = searchParams.get("start");
@@ -66,7 +49,14 @@ function EstudoContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [questions, listKey]);
 
-  const chips = describeFilters(filters, (slug) => resolveSubject(slug).name);
+  const notebooks = useNotebookStore((s) => s.notebooks);
+  const chips = describeFilters(
+    filters,
+    (slug) => resolveSubject(slug).name,
+    (id) => notebooks.find((n) => n.id === id)?.name ?? "lista"
+  );
+
+  if (!ready) return <LoadingState label="Carregando o banco de questões..." />;
 
   if (queue.length === 0) {
     return (
@@ -104,7 +94,13 @@ function EstudoContent() {
           <SlidersHorizontal size={13} /> Ajustar filtros
         </Link>
       </div>
-      <QuestionBattery questions={queue} kind="estudo" listKey={listKey} />
+      <QuestionBattery
+        questions={queue}
+        kind="estudo"
+        listKey={listKey}
+        exportTitle={titulo?.replace(/^⚡\s*/, "") || "Apostila de Questões"}
+        exportSubtitle={chips.length > 0 ? chips.map((c) => c.label).join(" · ") : "Seleção do banco de questões"}
+      />
     </div>
   );
 }

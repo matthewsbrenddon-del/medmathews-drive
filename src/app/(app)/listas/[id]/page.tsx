@@ -6,23 +6,27 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, ListChecks } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { EmptyBoxIllustration } from "@/components/Illustrations";
+import { LoadingState } from "@/components/LoadingState";
 import { QuestionBattery } from "@/components/QuestionBattery";
 import { useNotebookStore } from "@/lib/notebookStore";
-import { useQuestionStore } from "@/lib/questionStore";
+import { useQuestionStore, useQuestionsReady } from "@/lib/questionStore";
 
 export default function ListaDetailPage({ params }: { params: { id: string } }) {
   const notebooks = useNotebookStore((s) => s.notebooks);
   const entries = useNotebookStore((s) => s.entries);
   const allQuestions = useQuestionStore((s) => s.questions);
+  const ready = useQuestionsReady();
 
   const notebook = notebooks.find((n) => n.id === params.id);
   if (!notebook) notFound();
 
   const questionIds = entries[params.id];
-  const questions = useMemo(
-    () => (questionIds ?? []).map((id) => allQuestions.find((q) => q.id === id)).filter((q): q is NonNullable<typeof q> => Boolean(q)),
-    [questionIds, allQuestions]
-  );
+  const questions = useMemo(() => {
+    const byId = new Map(allQuestions.map((q) => [q.id, q]));
+    return (questionIds ?? []).map((id) => byId.get(id)).filter((q): q is NonNullable<typeof q> => Boolean(q));
+  }, [questionIds, allQuestions]);
+
+  if (!ready) return <LoadingState label="Carregando a lista..." />;
 
   return (
     <div className="flex flex-col gap-4">

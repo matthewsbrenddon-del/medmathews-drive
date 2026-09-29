@@ -98,14 +98,25 @@ export interface Question {
   subjectName: string;
   tema?: string;
   subtema?: string;
+  /** Especialidade original da fonte (ex.: Cardiologia, Nefrologia) — mais fina que a grande área. */
+  especialidade?: string;
   banca?: string;
   ano?: number;
+  /** Coleção de origem (ex.: "Revalida (INEP)", "Coletânea Medicina Livre"). */
+  colecao?: string;
+  /** Nome da prova/caderno de origem. */
+  prova?: string;
+  /** Link do PDF/pasta de origem (usado quando a imagem ainda não foi extraída). */
+  fonteUrl?: string;
+  imagemTipo?: string;
+  /** Título de seção da coletânea que vinha colado ao enunciado ("Bradiarritmias"). */
+  secao?: string;
   enunciado: string;
   alternatives: QuestionAlternative[];
   /** Letra da alternativa correta. */
   gabarito: string;
   comentario?: string;
-  /** 1 (fácil) a 5 (difícil). */
+  /** 1 (fácil) a 5 (difícil); 0 = não classificada. */
   dificuldade: number;
   tags: string[];
   observacoes?: string;

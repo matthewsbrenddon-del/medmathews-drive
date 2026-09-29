@@ -30,6 +30,10 @@ interface PracticePrefsState {
   readComments: Record<string, true>;
   /** Última questão vista em cada lista (chave = filtros da URL). */
   positions: Record<string, string>;
+  /** Quantas questões por sessão/apostila (0 = todas as filtradas). */
+  sessionSize: number;
+  /** Sorteia as questões da sessão em vez de seguir a ordem do filtro. */
+  sessionRandom: boolean;
 
   setFontScaleIndex: (i: number) => void;
   setAnswerOnClick: (v: boolean) => void;
@@ -41,6 +45,8 @@ interface PracticePrefsState {
   markCommentRead: (questionId: string) => void;
   savePosition: (listKey: string, questionId: string) => void;
   clearPosition: (listKey: string) => void;
+  setSessionSize: (n: number) => void;
+  setSessionRandom: (v: boolean) => void;
 }
 
 export const usePracticePrefsStore = create<PracticePrefsState>()(
@@ -55,6 +61,10 @@ export const usePracticePrefsStore = create<PracticePrefsState>()(
       skipVideoPreview: false,
       readComments: {},
       positions: {},
+      sessionSize: 20,
+      sessionRandom: false,
+      setSessionSize: (n) => set({ sessionSize: Math.max(0, Math.floor(n) || 0) }),
+      setSessionRandom: (v) => set({ sessionRandom: v }),
       setFontScaleIndex: (i) => set({ fontScaleIndex: Math.max(0, Math.min(FONT_SCALES.length - 1, i)) }),
       setAnswerOnClick: (v) => set({ answerOnClick: v }),
       setAutoAdvance: (v) => set({ autoAdvance: v }),

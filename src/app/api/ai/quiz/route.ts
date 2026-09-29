@@ -2,47 +2,70 @@ import { NextRequest, NextResponse } from "next/server";
 import { AI_MODELS, AI_UNAVAILABLE_MESSAGE, getAnthropicClient } from "@/lib/ai/anthropicClient";
 
 /**
- * Quizzes (spec adendo): geração de questões de múltipla escolha em tempo
- * real, a partir de um prompt livre e, opcionalmente, um texto de material
- * de referência colado pelo usuário (a plataforma não extrai texto de
+ * Quizzes: geração de questões interativas (múltipla escolha, vinheta
+ * clínica, verdadeiro/falso, correlação e estilo ENAMED) a partir de um tema
+ * e, opcionalmente, um texto de material de referência colado pelo usuário (a plataforma não extrai texto de
  * PDFs/vídeos do Drive — ver a mesma limitação em /api/ai/flashcards).
  */
 
-const MAX_QUESTIONS_PER_CALL = 20;
+const MAX_QUESTIONS_PER_CALL = 30;
 const MAX_MATERIAL_CHARS = 12000;
 
+type Tipo = "multipla" | "vinheta" | "vf" | "correlacao" | "enamed";
+const TIPOS: Tipo[] = ["multipla", "vinheta", "vf", "correlacao", "enamed"];
+
 interface GeneratedQuestion {
+  tipo: Tipo;
   enunciado: string;
-  alternatives: { letter: string; text: string }[];
-  gabarito: string;
+  alternatives?: { letter: string; text: string }[];
+  gabarito?: string;
+  afirmacoes?: { texto: string; verdadeira: boolean }[];
+  pares?: { esquerda: string; direita: string }[];
   comentario: string;
   tema: string;
 }
 
-function buildPrompt(params: { prompt: string; materialText?: string; quantidade: number }) {
-  const { prompt, materialText, quantidade } = params;
+const TIPO_REGRAS: Record<Tipo, string> = {
+  multipla: `"multipla": pergunta objetiva com 4 ou 5 alternativas (A–E), só uma correta. Campos: alternatives, gabarito.`,
+  vinheta: `"vinheta": caso clínico completo (idade, sexo, história, exame físico, exames) seguido de pergunta diagnóstica ou de conduta, 4 ou 5 alternativas. Campos: alternatives, gabarito.`,
+  vf: `"vf": um enunciado-guia e 4 a 5 afirmações para julgar. Campos: afirmacoes = [{"texto": "...", "verdadeira": true|false}] (misture verdadeiras e falsas).`,
+  correlacao: `"correlacao": instrução de associação e 4 a 5 pares. Campos: pares = [{"esquerda": "...", "direita": "..."}] (cada item da esquerda corresponde exatamente ao da direita do mesmo par).`,
+  enamed: `"enamed": estilo ENAMED/Revalida — enunciado longo e interpretativo, contexto de atenção à saúde no SUS quando couber, exatamente 4 alternativas (A–D). Campos: alternatives, gabarito.`,
+};
+
+const DIFICULDADE: Record<string, string> = {
+  facil: "fácil (conceitos centrais, distratores claramente errados)",
+  medio: "média (nível de prova de residência)",
+  dificil: "difícil (detalhes de diretrizes, distratores muito plausíveis, raciocínio em várias etapas)",
+};
+
+function buildPrompt(params: { prompt: string; materialText?: string; quantidade: number; tipos: Tipo[]; dificuldade: string }) {
+  const { prompt, materialText, quantidade, tipos, dificuldade } = params;
 
   const materialBlock = materialText
     ? `\n\nMaterial de referência fornecido pelo usuário (use como base factual — não invente informações que o contradigam):\n"""\n${materialText.slice(0, MAX_MATERIAL_CHARS)}\n"""`
     : "";
 
-  return `Você é um elaborador de questões de residência médica/revalida, no estilo de provas brasileiras (casos clínicos objetivos, uma alternativa correta).
+  return `Você é um elaborador de questões de residência médica/Revalida/ENAMED, no estilo de provas brasileiras.
 
 Tema/instrução do usuário: "${prompt}"${materialBlock}
 
-Gere ${quantidade} questões de múltipla escolha originais sobre esse tema, seguindo estas regras:
-- Enunciado em formato de caso clínico quando fizer sentido clinicamente (idade, sexo, história, exame físico, exames complementares), objetivo e sem ambiguidade.
-- Exatamente 4 ou 5 alternativas (letras A, B, C, D e opcionalmente E), plausíveis e mutuamente exclusivas — apenas uma correta.
-- "gabarito" é a letra da alternativa correta.
-- "comentario" explica de forma didática por que a alternativa correta está certa e por que as principais distratoras estão erradas (2-4 frases).
-- "tema" é um rótulo curto do assunto específico da questão (ex.: "Insuficiência Cardíaca Descompensada").
-- Não repita o mesmo caso clínico em questões diferentes.
+Gere ${quantidade} questões originais de dificuldade ${DIFICULDADE[dificuldade] ?? DIFICULDADE.medio}, distribuindo-as entre os tipos abaixo (use apenas estes tipos):
+${tipos.map((t) => "- " + TIPO_REGRAS[t]).join("\n")}
 
-Responda APENAS com um array JSON válido (sem markdown, sem texto antes ou depois), no formato exato:
-[{"enunciado": "...", "alternatives": [{"letter": "A", "text": "..."}, ...], "gabarito": "B", "comentario": "...", "tema": "..."}]`;
+Regras gerais:
+- Português do Brasil, sem ambiguidade, condutas conforme diretrizes brasileiras atuais (Ministério da Saúde, sociedades médicas).
+- "comentario" explica de forma didática a resposta correta e os erros principais (2-4 frases).
+- "tema" é um rótulo curto do assunto (ex.: "Sedação na UTI").
+- Não repita o mesmo caso em questões diferentes.
+
+Responda APENAS com um array JSON válido (sem markdown), cada item com "tipo", "enunciado", "comentario", "tema" e os campos do seu tipo. Exemplo de formato:
+[{"tipo": "multipla", "enunciado": "...", "alternatives": [{"letter": "A", "text": "..."}], "gabarito": "B", "comentario": "...", "tema": "..."},
+ {"tipo": "vf", "enunciado": "Julgue os itens:", "afirmacoes": [{"texto": "...", "verdadeira": true}], "comentario": "...", "tema": "..."},
+ {"tipo": "correlacao", "enunciado": "Associe...", "pares": [{"esquerda": "...", "direita": "..."}], "comentario": "...", "tema": "..."}]`;
 }
 
-function parseQuestions(text: string): GeneratedQuestion[] {
+function parseQuestions(text: string, allowed: Tipo[]): GeneratedQuestion[] {
   const trimmed = text.trim();
   const jsonText = trimmed.startsWith("[") ? trimmed : (trimmed.match(/\[[\s\S]*\]/)?.[0] ?? trimmed);
   const parsed = JSON.parse(jsonText);
@@ -50,19 +73,36 @@ function parseQuestions(text: string): GeneratedQuestion[] {
 
   const questions: GeneratedQuestion[] = [];
   for (const item of parsed) {
-    if (!item || typeof item.enunciado !== "string" || !Array.isArray(item.alternatives)) continue;
+    if (!item || typeof item.enunciado !== "string") continue;
+    const tipo: Tipo = TIPOS.includes(item.tipo) ? item.tipo : "multipla";
+    if (!allowed.includes(tipo) && !(tipo === "multipla" && allowed.length === 0)) continue;
+    const base = {
+      tipo,
+      enunciado: item.enunciado.trim(),
+      comentario: typeof item.comentario === "string" ? item.comentario.trim() : "",
+      tema: typeof item.tema === "string" ? item.tema.trim() : "",
+    };
+    if (tipo === "vf") {
+      const afirmacoes = (Array.isArray(item.afirmacoes) ? item.afirmacoes : [])
+        .filter((a: unknown) => a && typeof (a as { texto?: unknown }).texto === "string")
+        .map((a: { texto: string; verdadeira: unknown }) => ({ texto: a.texto.trim(), verdadeira: a.verdadeira === true || a.verdadeira === "true" }));
+      if (afirmacoes.length >= 2) questions.push({ ...base, afirmacoes });
+      continue;
+    }
+    if (tipo === "correlacao") {
+      const pares = (Array.isArray(item.pares) ? item.pares : [])
+        .filter((p: unknown) => p && typeof (p as { esquerda?: unknown }).esquerda === "string" && typeof (p as { direita?: unknown }).direita === "string")
+        .map((p: { esquerda: string; direita: string }) => ({ esquerda: p.esquerda.trim(), direita: p.direita.trim() }));
+      if (pares.length >= 2) questions.push({ ...base, pares });
+      continue;
+    }
+    if (!Array.isArray(item.alternatives)) continue;
     const alternatives = item.alternatives
       .filter((a: unknown): a is { letter: string; text: string } => Boolean(a) && typeof a === "object" && typeof (a as { text?: unknown }).text === "string")
       .map((a: { letter: string; text: string }) => ({ letter: String(a.letter).trim().toUpperCase(), text: String(a.text).trim() }));
     const gabarito = typeof item.gabarito === "string" ? item.gabarito.trim().toUpperCase() : "";
     if (alternatives.length < 2 || !gabarito || !alternatives.some((a: { letter: string }) => a.letter === gabarito)) continue;
-    questions.push({
-      enunciado: item.enunciado.trim(),
-      alternatives,
-      gabarito,
-      comentario: typeof item.comentario === "string" ? item.comentario.trim() : "",
-      tema: typeof item.tema === "string" ? item.tema.trim() : "",
-    });
+    questions.push({ ...base, alternatives, gabarito });
   }
   return questions;
 }
@@ -73,7 +113,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: AI_UNAVAILABLE_MESSAGE }, { status: 501 });
   }
 
-  let body: { prompt?: string; materialText?: string; quantidade?: number };
+  let body: { prompt?: string; materialText?: string; quantidade?: number; tipos?: string[]; dificuldade?: string };
   try {
     body = await req.json();
   } catch {
@@ -85,12 +125,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Descreva o tema/instrução para gerar as questões." }, { status: 400 });
   }
   const quantidade = Math.min(MAX_QUESTIONS_PER_CALL, Math.max(1, body.quantidade ?? 5));
+  const tipos = (body.tipos ?? []).filter((t): t is Tipo => TIPOS.includes(t as Tipo));
+  const allowed: Tipo[] = tipos.length > 0 ? tipos : ["multipla"];
+  const dificuldade = body.dificuldade ?? "medio";
 
   try {
     const response = await client.messages.create({
       model: AI_MODELS.quiz,
-      max_tokens: 8192,
-      messages: [{ role: "user", content: buildPrompt({ prompt, materialText: body.materialText, quantidade }) }],
+      max_tokens: 16000,
+      messages: [
+        { role: "user", content: buildPrompt({ prompt, materialText: body.materialText, quantidade, tipos: allowed, dificuldade }) },
+      ],
     });
 
     const textBlock = response.content.find((b) => b.type === "text");
@@ -98,7 +143,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "A IA não retornou texto." }, { status: 502 });
     }
 
-    const questions = parseQuestions(textBlock.text);
+    const questions = parseQuestions(textBlock.text, allowed);
     if (questions.length === 0) {
       return NextResponse.json({ error: "A IA não retornou nenhuma questão válida. Tente reformular o tema." }, { status: 502 });
     }

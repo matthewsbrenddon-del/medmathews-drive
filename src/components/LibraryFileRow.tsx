@@ -1,7 +1,7 @@
 "use client";
 
 import { BookOpen, CheckCircle2, CircleDot, File, FileText, Image as ImageIcon, Music, Play, Video } from "lucide-react";
-import { fileKind, fileName, isFileComplete, isFileStarted, type LibraryFileKind } from "@/lib/library";
+import { fileKind, fileName, fileTitle, isFileComplete, isFileStarted, type LibraryFileKind } from "@/lib/library";
 import { useStudyStore } from "@/lib/store";
 import type { LibraryFile } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -63,7 +63,7 @@ export function LibraryFileRow({
       </span>
       <span className="flex-1 min-w-0">
         <span className={cn("block text-sm truncate", done ? "text-muted-foreground" : "text-foreground font-medium")}>
-          {fileName(file)}
+          {fileTitle(file)}
         </span>
         {subtitle && <span className="block text-[11px] text-muted-foreground truncate">{subtitle}</span>}
       </span>

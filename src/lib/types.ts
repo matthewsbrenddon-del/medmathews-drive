@@ -24,6 +24,14 @@ export interface LibraryFile {
   area: string;
   /** Caminho bruto de pastas até o arquivo, separado por " › " — o último segmento é o nome do arquivo. */
   conteudo: string;
+  /** Título legível (scripts/build-library-topics.py): "Choque — Podcast" em vez de "Podcast.mp3". */
+  titulo?: string;
+  /** Videoaula, Slide, Resumo, Apostila, Podcast, Capítulo de livro... */
+  tipo?: string;
+  /** Assunto canônico, o mesmo entre cursos diferentes ("Insuficiência Cardíaca"). */
+  tema?: string;
+  /** Recorte específico da pasta de origem. */
+  subtema?: string;
 }
 
 export type WatchStatus = "nao_iniciada" | "em_andamento" | "assistida";

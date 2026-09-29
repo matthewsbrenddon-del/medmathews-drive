@@ -15,7 +15,7 @@ import { classifyLibrary, type ClassifiedFile } from "@/lib/classification";
 import {
   UNCLASSIFIED_LABEL,
   fileKind,
-  fileName,
+  fileName, fileTitle,
   fullPath,
   isFileComplete,
   isFileStarted,
@@ -109,7 +109,7 @@ export function LibraryKindBrowser({ mode }: { mode: "video" | "material" }) {
         if (statusFilter === "em_andamento" && !started) return false;
         if (statusFilter === "nao_iniciado" && (done || started)) return false;
       }
-      if (q && !normalizeText(`${f.curso} ${f.area} ${f.conteudo} ${f.disciplina ?? ""}`).includes(q)) return false;
+      if (q && !normalizeText(`${f.titulo ?? ""} ${f.tema ?? ""} ${f.subtema ?? ""} ${f.tipo ?? ""} ${f.curso} ${f.area} ${f.conteudo} ${f.disciplina ?? ""}`).includes(q)) return false;
       return true;
     });
   }, [pool, area, curso, statusFilter, onlyFavorites, query, userStates]);
@@ -213,7 +213,7 @@ export function LibraryKindBrowser({ mode }: { mode: "video" | "material" }) {
                 const subject = file.subjectSlug ? resolveSubject(file.subjectSlug) : undefined;
                 return (
                   <div key={file.id} className="card overflow-hidden group flex flex-col hover:shadow-lift hover:-translate-y-0.5 transition-all">
-                    <button type="button" onClick={() => open(file)} className="text-left" aria-label={`Assistir ${fileName(file)}`}>
+                    <button type="button" onClick={() => open(file)} className="text-left" aria-label={`Assistir ${fileTitle(file)}`}>
                       <VideoThumb file={file} />
                     </button>
                     <div className="p-3.5 flex flex-col gap-1.5 flex-1">
@@ -228,9 +228,14 @@ export function LibraryKindBrowser({ mode }: { mode: "video" | "material" }) {
                         <FavoriteButton fileId={file.id} size="sm" />
                       </div>
                       <button type="button" onClick={() => open(file)} className="text-left">
-                        <p className="text-sm font-medium text-foreground line-clamp-2" title={fileName(file)}>
-                          {fileName(file)}
+                        <p className="text-sm font-medium text-foreground line-clamp-2" title={fileTitle(file)}>
+                          {fileTitle(file)}
                         </p>
+                        {file.tema && (
+                          <p className="mt-1 inline-flex max-w-full items-center rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-medium text-accent truncate">
+                            {file.tema}
+                          </p>
+                        )}
                         <p className="text-[11px] text-muted-foreground truncate mt-0.5" title={folderOf(file)}>
                           {folderOf(file)}
                         </p>

@@ -38,12 +38,15 @@ Em **Cronograma**, escolha as disciplinas a priorizar, uma data-alvo e quantos m
 
 ## Disciplinas — uma biblioteca, duas navegações
 
-**Disciplinas** é a biblioteca completa do acervo real (cursinhos, e-books, bancos de questões em PDF — hoje ~13,6 mil arquivos em `public/seed-data/library-mapeamento.json`, gerado a partir de `seed-data/MedStudyHub_Mapeamento_Materiais.xlsx`), navegável de duas formas sobre o **mesmo** conteúdo — nunca duas listas separadas:
+**Disciplinas** é a biblioteca completa do acervo real (cursinhos, e-books, bancos de questões em PDF — hoje ~13,6 mil arquivos em `public/seed-data/library-mapeamento.json`, gerado a partir de `seed-data/MedStudyHub_Mapeamento_Materiais.xlsx`), navegável de três formas sobre o **mesmo** conteúdo — nunca listas separadas:
 
 - **Por Grande Área** (padrão): Grande Área ENAMED → Disciplina → arquivo, usando a classificação clínica (`src/lib/classification.ts`). Itens sem classificação confiável ficam agrupados em "A classificar" (por curso de origem), nunca escondidos.
+- **Por Tema**: Grande Área → Tema → Subtema → arquivo, juntando o mesmo assunto de todos os cursinhos (ex.: "Insuficiência Cardíaca" reúne as aulas da EstratégiaMED, os podcasts/pílulas da MedCel, as videoaulas do Medcurso e da Sanar).
 - **Por Curso**: exatamente a estrutura de pastas original de cada provedor (MedCel, EstratégiaMED, MedCurso, Sanar...) — cada um organiza diferente, e essa visão preserva esse contexto.
 
 Ambas abrem o mesmo `FilePreviewModal` (preview do Drive embutido num iframe, sem redirecionar para fora da plataforma) e escrevem no mesmo `useStudyStore` (favorito/assistido/estudado, chaveado pelo ID do arquivo do Drive) — abrir um item por qualquer uma das visões nunca duplica progresso.
+
+**Títulos, temas e subtemas** (`scripts/build-library-topics.py`): muitos arquivos têm nome genérico ("1. Aula.mp4", "Podcast.mp3", "309990.mp4", "MAT322583_IDAPOST…pdf") — o assunto está na pasta que os contém. O script lê o contexto de pasta de cada arquivo e grava em `library-mapeamento.json` um `titulo` legível ("Choque — Podcast", "Insuficiência Cardíaca (Parte 1) — Aula 2"), o `tipo` (Videoaula, Slide, Resumo, Apostila, Podcast, Pílula, Capítulo de livro, Resolução de questão…), o `tema` canônico (dicionário curado a partir da leitura dos ~1.500 nomes de pasta, para o mesmo assunto casar entre cursos) e o `subtema`. Rode `python3 scripts/build-library-topics.py --report` depois de atualizar a planilha. A busca de Videoaulas, Materiais e Disciplinas considera título, tema e subtema.
 
 **Classificação dos itens:**
 - `src/lib/classification.ts#autoClassify` tenta inferir a grande área a partir do caminho original (área da planilha → subpastas → nome do curso) contra os aliases de `src/lib/subjects.ts#matchKnownSubject` — só classifica quando há correspondência confiável (nunca força uma área errada).

@@ -24,7 +24,7 @@ import type { LibraryFile } from "@/lib/types";
 import {
   fileEmbedUrl,
   fileKind,
-  fileName,
+  fileName, fileTitle,
   fileWebViewUrl,
   isFileComplete,
   isFileStarted,
@@ -117,7 +117,7 @@ export function FilePreviewModal({
     setDockContext({
       tipo: isVideo ? "aula" : "material",
       id: file.id,
-      label: `${isVideo ? "Aula" : "Material"}: ${fileName(file)}`,
+      label: `${isVideo ? "Aula" : "Material"}: ${fileTitle(file)}`,
     });
     return () => setDockContext(null);
   }, [file, isVideo, setDockContext]);
@@ -157,7 +157,7 @@ export function FilePreviewModal({
   }
 
   const Icon = KIND_ICON[kind];
-  const name = fileName(file);
+  const name = fileTitle(file);
   const isCompact = kind === "audio";
   const upcoming = playlist && index >= 0 ? playlist.slice(index + 1, index + 4) : [];
 
@@ -264,7 +264,7 @@ export function FilePreviewModal({
                             <ThematicCover file={f} className="aspect-video" />
                             <span className="flex items-center gap-1 px-2 py-1.5">
                               {isFileComplete(f, userStates[f.id]) && <CheckCircle2 size={11} className="text-success shrink-0" />}
-                              <span className="text-[11px] text-foreground truncate">{fileName(f)}</span>
+                              <span className="text-[11px] text-foreground truncate">{fileTitle(f)}</span>
                             </span>
                           </button>
                         ))}

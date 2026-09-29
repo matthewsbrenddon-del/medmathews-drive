@@ -39,6 +39,7 @@ import {
   type LibraryTreeNode,
   type LibraryView,
   type NodeProgress,
+  fileTitle,
 } from "@/lib/library";
 import { useStudyStore } from "@/lib/store";
 import { resolveSubject } from "@/lib/subjects";
@@ -52,7 +53,7 @@ function pct(p: NodeProgress | undefined, total: number) {
 }
 
 function nodeColor(node: LibraryTreeNode, view: LibraryView): string | undefined {
-  if (view !== "area" || node.path.length === 0) return undefined;
+  if (view === "curso" || node.path.length === 0) return undefined;
   if (node.path[0] === UNCLASSIFIED_LABEL) return undefined;
   return resolveSubject(node.path[0]).colorToken;
 }
@@ -227,7 +228,7 @@ function DisciplinasContent() {
   const currentProgress = progress.get(current.key);
   const currentPercent = pct(currentProgress, current.total);
   const pdfCount = current.total - current.videos;
-  const rootLabel = view === "area" ? "Grandes Áreas" : "Cursos";
+  const rootLabel = view === "area" ? "Grandes Áreas" : view === "tema" ? "Temas" : "Cursos";
 
   return (
     <div className="flex flex-col gap-5">
@@ -237,14 +238,15 @@ function DisciplinasContent() {
             <LayoutGrid size={22} className="text-accent" /> Disciplinas
           </h1>
           <p className="text-muted-foreground mt-1">
-            Todo o acervo real, com player embutido — pela classificação clínica ou pela estrutura de cada cursinho. Mesmo
-            conteúdo e mesmo progresso nas duas visões.
+            Todo o acervo real, com player embutido — pela classificação clínica, por tema (o mesmo assunto de todos os
+            cursinhos junto) ou pela estrutura de cada curso. Mesmo conteúdo e mesmo progresso nas três visões.
           </p>
         </div>
         <div className="flex rounded-xl border border-border p-1 bg-muted shrink-0">
           {(
             [
               ["area", "Por Grande Área"],
+              ["tema", "Por Tema"],
               ["curso", "Por Curso"],
             ] as const
           ).map(([id, label]) => (
@@ -384,7 +386,7 @@ function DisciplinasContent() {
                     <span className="text-[11px] font-semibold uppercase tracking-wide text-primary inline-flex items-center gap-1">
                       <Sparkles size={11} /> {startHere.reason === "continuar" ? "Continue de onde parou" : "Comece por aqui"}
                     </span>
-                    <span className="block font-medium text-foreground truncate">{fileName(startHere.file)}</span>
+                    <span className="block font-medium text-foreground truncate">{fileTitle(startHere.file)}</span>
                     <span className="block text-xs text-muted-foreground truncate">
                       {treePathFor(startHere.file as ClassifiedFile, view).slice(current.path.length).join(" › ") || current.name}
                     </span>

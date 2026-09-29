@@ -21,8 +21,8 @@ export const useLibraryNavStore = create<LibraryNavState>()(
   persist(
     (set) => ({
       view: "area",
-      pathByView: { area: [], curso: [] },
-      expandedByView: { area: [], curso: [] },
+      pathByView: { area: [], tema: [], curso: [] },
+      expandedByView: { area: [], tema: [], curso: [] },
       setView: (view) => set({ view }),
       setPath: (view, path) => set((s) => ({ pathByView: { ...s.pathByView, [view]: path } })),
       toggleExpanded: (view, key, open) =>
@@ -38,6 +38,18 @@ export const useLibraryNavStore = create<LibraryNavState>()(
           expandedByView: { ...s.expandedByView, [view]: Array.from(new Set([...s.expandedByView[view], ...keys])) },
         })),
     }),
-    { name: "medstudy-hub-library-nav" }
+    {
+      name: "medstudy-hub-library-nav",
+      // Estados salvos antes da visão "tema" não têm essa chave.
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<LibraryNavState>;
+        return {
+          ...current,
+          ...p,
+          pathByView: { ...current.pathByView, ...(p.pathByView ?? {}) },
+          expandedByView: { ...current.expandedByView, ...(p.expandedByView ?? {}) },
+        };
+      },
+    }
   )
 );

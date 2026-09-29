@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { SubjectIcon } from "./SubjectIcon";
-import { fileKind, fileName, fileThumbnailUrl } from "@/lib/library";
+import { fileKind, fileName, fileThumbnailUrl, fileTitle } from "@/lib/library";
 import { resolveSubject } from "@/lib/subjects";
 import type { LibraryFile } from "@/lib/types";
 import type { ClassifiedFile } from "@/lib/classification";
@@ -118,7 +118,7 @@ export function ThematicCover({
             </span>
           )}
           {large && name !== number && (
-            <span className="text-white font-semibold text-lg leading-snug line-clamp-2 drop-shadow">{name}</span>
+            <span className="text-white font-semibold text-lg leading-snug line-clamp-2 drop-shadow">{fileTitle(file)}</span>
           )}
         </div>
       </div>

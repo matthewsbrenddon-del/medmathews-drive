@@ -75,7 +75,7 @@ export function classifyLibrary(files: LibraryFile[], overrides: Record<string, 
         subjectSlug: manual.subjectSlug,
         subjectName: resolveSubject(manual.subjectSlug).name,
         disciplina: manual.disciplina,
-        subtema: manual.subtema,
+        subtema: manual.subtema ?? file.subtema,
         classificationSource: manual.source,
       };
     }

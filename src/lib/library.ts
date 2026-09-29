@@ -45,6 +45,11 @@ export function fileName(file: LibraryFile): string {
   return parts[parts.length - 1] ?? file.conteudo;
 }
 
+/** Título para exibir: o título legível do acervo enriquecido, ou o nome do arquivo sem extensão. */
+export function fileTitle(file: LibraryFile): string {
+  return file.titulo || fileName(file).replace(/(\.[a-zA-Z0-9]{2,4})+$/, "");
+}
+
 export function fileExtension(name: string): string {
   const m = name.match(/\.([a-zA-Z0-9]+)$/);
   return m ? m[1].toLowerCase() : "";
@@ -91,7 +96,9 @@ export function isFileStarted(file: LibraryFile, state?: ContentProgress): boole
   return Boolean(state.lastViewedAt) || state.watchStatus === "em_andamento" || state.readStatus === "acessado";
 }
 
-export type LibraryView = "area" | "curso";
+export type LibraryView = "area" | "tema" | "curso";
+
+export const SEM_TEMA_LABEL = "Outros assuntos";
 
 export interface LibraryTreeNode {
   key: string;
@@ -114,6 +121,12 @@ export function nodeKey(path: string[]): string {
 export function treePathFor(file: ClassifiedFile, view: LibraryView): string[] {
   const folders = fullPath(file).slice(0, -1);
   if (view === "curso") return folders;
+  if (view === "tema") {
+    // Mesmo assunto de cursos diferentes lado a lado: Área › Tema › Subtema.
+    const area = file.subjectSlug ? resolveSubject(file.subjectSlug).name : UNCLASSIFIED_LABEL;
+    const tema = file.tema || SEM_TEMA_LABEL;
+    return file.subtema && file.subtema !== tema ? [area, tema, file.subtema] : [area, tema];
+  }
   if (!file.subjectSlug) return [UNCLASSIFIED_LABEL, ...folders];
   return [resolveSubject(file.subjectSlug).name, file.disciplina || "Geral", file.curso];
 }
@@ -142,7 +155,7 @@ export function buildLibraryTree(items: ClassifiedFile[], view: LibraryView): Li
   const subjectOrder = [...KNOWN_SUBJECTS.map((s) => s.name), UNCLASSIFIED_LABEL];
   function finalize(node: LibraryTreeNode) {
     node.files.sort((a, b) => naturalCompare(fileName(a), fileName(b)));
-    if (node === root && view === "area") {
+    if (node === root && view !== "curso") {
       node.children.sort((a, b) => subjectOrder.indexOf(a.name) - subjectOrder.indexOf(b.name));
     } else {
       node.children.sort((a, b) => naturalCompare(a.name, b.name));
@@ -281,9 +294,9 @@ export function searchFiles(files: LibraryFile[], query: string, limit = 150): L
   const results: LibraryFileNode[] = [];
   for (const file of files) {
     const path = fullPath(file);
-    const haystack = normalizeText(`${file.curso} ${file.area} ${file.conteudo}`);
+    const haystack = normalizeText(`${file.titulo ?? ""} ${file.tema ?? ""} ${file.subtema ?? ""} ${file.tipo ?? ""} ${file.curso} ${file.area} ${file.conteudo}`);
     if (!haystack.includes(q)) continue;
-    results.push({ type: "file", name: fileName(file), path, file, kind: fileKind(file) });
+    results.push({ type: "file", name: fileTitle(file), path, file, kind: fileKind(file) });
     if (results.length >= limit) break;
   }
   return results;
@@ -311,7 +324,7 @@ export function findRelatedLessons(
   const scored: { file: ClassifiedFile; score: number }[] = [];
   for (const file of items) {
     if (fileKind(file) !== "video") continue;
-    const haystack = normalizeText(`${file.disciplina ?? ""} ${file.subtema ?? ""} ${file.area} ${file.conteudo}`);
+    const haystack = normalizeText(`${file.tema ?? ""} ${file.titulo ?? ""} ${file.disciplina ?? ""} ${file.subtema ?? ""} ${file.area} ${file.conteudo}`);
     let hits = 0;
     for (const t of tokens) if (haystack.includes(t)) hits++;
     if (hits === 0) continue;

@@ -19,7 +19,7 @@ import { classifyLibrary } from "@/lib/classification";
 import {
   computeSubjectProgressFromLibrary,
   fileKind,
-  fileName,
+  fileName, fileTitle,
   fullPath,
   isFileComplete,
   naturalCompare,
@@ -176,7 +176,7 @@ export default function DashboardPage() {
                       {file.disciplina ? ` · ${file.disciplina}` : ""}
                     </p>
                   </div>
-                  <h3 className="font-medium text-sm text-foreground line-clamp-2">{fileName(file)}</h3>
+                  <h3 className="font-medium text-sm text-foreground line-clamp-2">{fileTitle(file)}</h3>
                   <p className="text-[11px] text-muted-foreground truncate">{folderKey(file)}</p>
                   <span className="mt-auto text-xs font-medium text-primary inline-flex items-center gap-1">
                     <RotateCcw size={12} /> {isVideo ? "Continuar aula" : "Continuar leitura"}

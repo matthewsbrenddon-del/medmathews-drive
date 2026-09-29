@@ -73,7 +73,8 @@ export const useCadernoStore = create<CadernoStoreState>()(
           cadernos: s.cadernos.map((c) => {
             if (c.id !== id) return c;
             const bloco = [origem ? originLink(origem) : "", texto.trim()].filter(Boolean).join("\n");
-            const conteudo = c.conteudo.trim() ? `${c.conteudo.trimEnd()}\n\n---\n\n${bloco}` : bloco;
+            if (!bloco) return c;
+            const conteudo = (c.conteudo.trim() ? `${c.conteudo.trimEnd()}\n\n---\n\n${bloco}` : bloco) + "\n";
             return { ...c, conteudo, atualizadoEm: new Date().toISOString() };
           }),
           lastUsedId: id,

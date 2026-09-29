@@ -1,5 +1,6 @@
 import { jsPDF } from "jspdf";
 import type { Question } from "./types";
+import { reflowText } from "./reflowText";
 
 /** Máximo de questões por exportação, para evitar PDFs gigantes/travamentos. */
 export const PDF_EXPORT_MAX = 100;
@@ -136,7 +137,7 @@ export function exportQuestionsToPdf(
     });
     cursor.y += 1.5;
 
-    writeParagraph(doc, cursor, question.enunciado, { fontSize: 10.5, lineHeight: 5 });
+    writeParagraph(doc, cursor, reflowText(question.enunciado), { fontSize: 10.5, lineHeight: 5 });
     cursor.y += 1.5;
 
     if (question.anulada) {
@@ -148,7 +149,7 @@ export function exportQuestionsToPdf(
     }
 
     for (const alt of question.alternatives) {
-      writeParagraph(doc, cursor, `${alt.letter}) ${alt.text}`, { fontSize: 10, indent: 4, lineHeight: 4.6 });
+      writeParagraph(doc, cursor, `${alt.letter}) ${reflowText(alt.text).replace(/\n/g, " ")}`, { fontSize: 10, indent: 4, lineHeight: 4.6 });
     }
     cursor.y += 4;
 

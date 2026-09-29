@@ -25,48 +25,69 @@ type Mode = "escrever" | "visualizar" | "dividido";
 
 const SAVE_DELAY_MS = 1200;
 
-/** Editor de um caderno: markdown leve + barra de formatação + autosave. */
-export function CadernoEditor({ cadernoId, compact = false }: { cadernoId: string; compact?: boolean }) {
+/** Editor de um caderno: markdown leve + barra de formatação + autosave.
+ * Grava na store a cada alteração (sem risco de um envio externo — "Enviar ao
+ * Caderno" — ser sobrescrito por um salvamento atrasado); o indicador
+ * "Salvando…/Salvo" é só visual. */
+export function CadernoEditor({
+  cadernoId,
+  compact = false,
+  fill = false,
+  hideTitle = false,
+}: {
+  cadernoId: string;
+  compact?: boolean;
+  /** Ocupa toda a altura disponível (painel acoplado). */
+  fill?: boolean;
+  /** O título já aparece fora (seletor do painel acoplado). */
+  hideTitle?: boolean;
+}) {
   const caderno = useCadernoStore((s) => s.cadernos.find((c) => c.id === cadernoId));
   const updateConteudo = useCadernoStore((s) => s.updateConteudo);
   const renameCaderno = useCadernoStore((s) => s.renameCaderno);
 
-  const [draft, setDraft] = useState(caderno?.conteudo ?? "");
+  const draft = caderno?.conteudo ?? "";
   const [saving, setSaving] = useState(false);
   const [mode, setMode] = useState<Mode>(compact ? "escrever" : "dividido");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingRef = useRef<string | null>(null);
+  const ownChangeRef = useRef(false);
+  const lastLengthRef = useRef(draft.length);
 
-  // Troca de caderno (ou conteúdo alterado por fora, ex.: "Adicionar ao caderno"
-  // em outro lugar): recarrega o rascunho só se não houver edição pendente.
+  // Conteúdo anexado de fora (Enviar ao Caderno / Anotar): rola até o fim e
+  // posiciona o cursor lá, pronto para continuar escrevendo.
   useEffect(() => {
-    if (pendingRef.current === null) setDraft(caderno?.conteudo ?? "");
-  }, [cadernoId, caderno?.conteudo]);
+    const grew = draft.length > lastLengthRef.current;
+    lastLengthRef.current = draft.length;
+    if (ownChangeRef.current) {
+      ownChangeRef.current = false;
+      return;
+    }
+    const el = textareaRef.current;
+    if (grew && el) {
+      el.scrollTop = el.scrollHeight;
+      if (compact) {
+        el.focus();
+        el.setSelectionRange(draft.length, draft.length);
+      }
+    }
+  }, [draft, compact]);
 
-  useEffect(() => {
-    return () => {
+  useEffect(
+    () => () => {
       if (timerRef.current) clearTimeout(timerRef.current);
-      if (pendingRef.current !== null) updateConteudo(cadernoId, pendingRef.current);
-    };
-  }, [cadernoId, updateConteudo]);
+    },
+    [],
+  );
 
   if (!caderno) return null;
 
-  function scheduleSave(value: string) {
-    pendingRef.current = value;
+  function change(value: string) {
+    ownChangeRef.current = true;
+    updateConteudo(cadernoId, value);
     setSaving(true);
     if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
-      if (pendingRef.current !== null) updateConteudo(cadernoId, pendingRef.current);
-      pendingRef.current = null;
-      setSaving(false);
-    }, SAVE_DELAY_MS);
-  }
-
-  function change(value: string) {
-    setDraft(value);
-    scheduleSave(value);
+    timerRef.current = setTimeout(() => setSaving(false), SAVE_DELAY_MS);
   }
 
   function wrap(marker: string) {
@@ -90,7 +111,10 @@ export function CadernoEditor({ cadernoId, compact = false }: { cadernoId: strin
     const block = draft.slice(lineStart, b);
     const updated = block
       .split("\n")
-      .map((line, i) => (prefix === "1. " ? `${i + 1}. ` : prefix) + line.replace(/^(#{1,3}\s|[-*]\s(\[[ xX]\]\s)?|\d+[.)]\s|>\s?)/, ""))
+      .map(
+        (line, i) =>
+          (prefix === "1. " ? `${i + 1}. ` : prefix) + line.replace(/^(#{1,3}\s|[-*]\s(\[[ xX]\]\s)?|\d+[.)]\s|>\s?)/, ""),
+      )
       .join("\n");
     change(draft.slice(0, lineStart) + updated + draft.slice(b));
     requestAnimationFrame(() => el.focus());
@@ -123,20 +147,25 @@ export function CadernoEditor({ cadernoId, compact = false }: { cadernoId: strin
   const showPreview = mode !== "escrever";
 
   return (
-    <div className="flex flex-col gap-3 min-h-0 flex-1">
+    <div className={cn("flex flex-col gap-3 min-h-0 flex-1", fill && "h-full")}>
       <div className="flex items-center justify-between gap-3">
-        <input
-          key={caderno.id}
-          defaultValue={caderno.titulo}
-          onBlur={(e) => e.target.value.trim() !== caderno.titulo && renameCaderno(caderno.id, e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
-          aria-label="Título do caderno"
-          className={cn(
-            "bg-transparent font-semibold text-foreground outline-none min-w-0 flex-1 rounded-lg px-1 -mx-1 focus:bg-muted",
-            compact ? "text-base" : "text-xl"
-          )}
-        />
-        <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1 shrink-0 font-metric" aria-live="polite">
+        {!hideTitle && (
+          <input
+            key={caderno.id}
+            defaultValue={caderno.titulo}
+            onBlur={(e) => e.target.value.trim() !== caderno.titulo && renameCaderno(caderno.id, e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+            aria-label="Título do caderno"
+            className={cn(
+              "bg-transparent font-semibold text-foreground outline-none min-w-0 flex-1 rounded-lg px-1 -mx-1 focus:bg-muted",
+              compact ? "text-base" : "text-xl",
+            )}
+          />
+        )}
+        <span
+          className="text-[11px] text-muted-foreground inline-flex items-center gap-1 shrink-0 font-metric"
+          aria-live="polite"
+        >
           {saving ? (
             <>
               <Loader2 size={11} className="animate-spin" /> Salvando…
@@ -166,7 +195,7 @@ export function CadernoEditor({ cadernoId, compact = false }: { cadernoId: strin
             </button>
           ))}
         </div>
-        {!compact && (
+        {
           <div className="flex rounded-xl border border-border p-0.5 bg-muted/50">
             {(
               [
@@ -174,37 +203,55 @@ export function CadernoEditor({ cadernoId, compact = false }: { cadernoId: strin
                 ["dividido", Columns2, "Lado a lado"],
                 ["visualizar", Eye, "Visualizar"],
               ] as const
-            ).map(([id, Icon, label]) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setMode(id)}
-                className={cn(
-                  "inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg transition-colors",
-                  mode === id ? "bg-surface shadow-card text-foreground" : "text-muted-foreground"
-                )}
-              >
-                <Icon size={13} /> <span className="hidden sm:inline">{label}</span>
-              </button>
-            ))}
+            )
+              .filter(([id]) => !compact || id !== "dividido")
+              .map(([id, Icon, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setMode(id)}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg transition-colors",
+                    mode === id ? "bg-surface shadow-card text-foreground" : "text-muted-foreground",
+                  )}
+                >
+                  <Icon size={13} /> <span className={compact ? "sr-only" : "hidden sm:inline"}>{label}</span>
+                </button>
+              ))}
           </div>
-        )}
+        }
       </div>
 
-      <div className={cn("grid gap-3 min-h-0 flex-1", showEditor && showPreview ? "lg:grid-cols-2" : "grid-cols-1")}>
+      <div
+        className={cn(
+          "grid gap-3 min-h-0 flex-1",
+          showEditor && showPreview ? "lg:grid-cols-2" : "grid-cols-1",
+          fill && "grid-rows-1",
+        )}
+      >
         {showEditor && (
           <textarea
             ref={textareaRef}
             value={draft}
             onChange={(e) => change(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder={"Escreva livremente: resumos, dúvidas, mnemônicos...\n\n# Título\n- tópico\n**negrito**, *itálico*, ==grifo=="}
-            className={cn("input font-mono text-[13px] leading-relaxed resize-none", compact ? "min-h-[220px]" : "min-h-[420px]")}
+            placeholder={
+              "Escreva livremente: resumos, dúvidas, mnemônicos...\n\n# Título\n- tópico\n**negrito**, *itálico*, ==grifo=="
+            }
+            className={cn(
+              "input font-mono text-[13px] leading-relaxed resize-none",
+              fill ? "flex-1 min-h-[200px] h-full" : compact ? "min-h-[220px]" : "min-h-[420px]",
+            )}
             aria-label="Conteúdo do caderno"
           />
         )}
         {showPreview && (
-          <div className={cn("rounded-xl border border-border bg-surface p-4 overflow-y-auto", compact ? "max-h-[260px]" : "min-h-[420px]")}>
+          <div
+            className={cn(
+              "rounded-xl border border-border bg-surface p-4 overflow-y-auto",
+              compact ? "max-h-[260px]" : "min-h-[420px]",
+            )}
+          >
             {draft.trim() ? <Markdown source={draft} /> : <p className="text-sm text-muted-foreground">Nada escrito ainda.</p>}
           </div>
         )}

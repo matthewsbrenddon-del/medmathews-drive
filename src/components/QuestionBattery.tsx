@@ -21,13 +21,15 @@ import {
   RotateCcw,
   Scissors,
   Settings2,
+  Highlighter,
   Star,
   Target,
   Type,
   X,
 } from "lucide-react";
 import { FilePreviewModal } from "./FilePreviewModal";
-import { HighlightableText } from "./HighlightableText";
+import { COLOR_ORDER, HIGHLIGHT_HEX, HighlightableText, UNDERLINE_HEX } from "./HighlightableText";
+import { CadernoDock } from "./CadernoDock";
 import { LibraryFileRow } from "./LibraryFileRow";
 import { NoteButton } from "./NoteButton";
 import { NotebookPicker } from "./NotebookPicker";
@@ -45,6 +47,8 @@ import { useStudyTimer } from "@/lib/useStudyTimer";
 import { exportQuestionsToPdf, PDF_EXPORT_MAX } from "@/lib/pdfExport";
 import { resolveSubject } from "@/lib/subjects";
 import { cn } from "@/lib/utils";
+import { reflowText } from "@/lib/reflowText";
+import { useCadernoDockStore } from "@/lib/cadernoDockStore";
 import type { LibraryFile, Question, StudySession } from "@/lib/types";
 
 interface AnswerState {
@@ -182,6 +186,8 @@ function QuestionItem({
     id: question.id,
     label: `Questão ${index + 1} — ${question.tema ?? question.subjectName}`,
   };
+  const scissorsMode = usePracticePrefsStore((s) => s.scissorsMode);
+  const enunciado = useMemo(() => reflowText(question.enunciado), [question.enunciado]);
 
   const breadcrumb = [
     [question.banca, question.ano].filter(Boolean).join(" "),
@@ -304,8 +310,9 @@ function QuestionItem({
         <HighlightableText
           questionId={question.id}
           field="enunciado"
-          text={question.enunciado}
-          className="text-foreground leading-relaxed whitespace-pre-line select-text"
+          text={enunciado}
+          origin={origin}
+          className="text-foreground leading-[1.75] whitespace-pre-line select-text sm:text-justify hyphens-auto [text-wrap:pretty]"
         />
       </div>
 
@@ -353,7 +360,16 @@ function QuestionItem({
               aria-checked={isSelected}
               tabIndex={submitted ? -1 : 0}
               aria-disabled={submitted}
-              onClick={() => !submitted && onSelect(alt.letter)}
+              onClick={() => {
+                if (submitted || window.getSelection()?.isCollapsed === false) return;
+                if (scissorsMode) onToggleStrike(alt.letter);
+                else onSelect(alt.letter);
+              }}
+              onContextMenu={(e) => {
+                if (submitted) return;
+                e.preventDefault();
+                onToggleStrike(alt.letter);
+              }}
               onKeyDown={(e) => {
                 if (!submitted && (e.key === "Enter" || e.key === " ")) {
                   e.preventDefault();
@@ -362,7 +378,8 @@ function QuestionItem({
               }}
               className={cn(
                 "group/alt flex items-start gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors",
-                submitted ? "cursor-default" : "cursor-pointer",
+                submitted ? "cursor-default" : scissorsMode ? "cursor-cell" : "cursor-pointer",
+                isStruck && !submitted && "opacity-55",
                 row
               )}
               style={{ fontSize: `${fontScale * 0.9}rem` }}
@@ -373,13 +390,25 @@ function QuestionItem({
                   circle
                 )}
               >
-                {submitted && isCorrect ? <Check size={14} strokeWidth={3} /> : submitted && isSelected ? <X size={14} strokeWidth={3} /> : alt.letter}
+                {submitted && isCorrect ? (
+                  <Check size={14} strokeWidth={3} />
+                ) : submitted && isSelected ? (
+                  <X size={14} strokeWidth={3} />
+                ) : isStruck ? (
+                  <Scissors size={12} />
+                ) : (
+                  alt.letter
+                )}
               </span>
               <HighlightableText
                 questionId={question.id}
                 field={alt.letter}
-                text={alt.text}
-                className={cn("flex-1 select-text pt-0.5 leading-relaxed", isStruck && "line-through text-muted-foreground")}
+                text={reflowText(alt.text)}
+                origin={origin}
+                className={cn(
+                  "flex-1 min-w-0 select-text pt-0.5 leading-relaxed [text-wrap:pretty]",
+                  isStruck && "line-through decoration-2 decoration-danger/70 text-muted-foreground"
+                )}
               />
               {!submitted && (
                 <button
@@ -389,10 +418,10 @@ function QuestionItem({
                     onToggleStrike(alt.letter);
                   }}
                   aria-label={isStruck ? `Restaurar alternativa ${alt.letter}` : `Eliminar alternativa ${alt.letter}`}
-                  title={isStruck ? "Restaurar" : "Eliminar (riscar)"}
+                  title={isStruck ? "Restaurar alternativa" : "Cortar alternativa (ou clique com o botão direito)"}
                   className={cn(
-                    "shrink-0 h-7 w-7 inline-flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-opacity",
-                    isStruck ? "opacity-100 text-danger" : "opacity-0 group-hover/alt:opacity-100 focus:opacity-100"
+                    "shrink-0 h-7 w-7 inline-flex items-center justify-center rounded-full hover:bg-muted transition-all",
+                    isStruck ? "text-danger bg-danger/10" : "text-muted-foreground/40 hover:text-foreground group-hover/alt:text-muted-foreground"
                   )}
                 >
                   <Scissors size={13} />
@@ -457,7 +486,7 @@ function QuestionItem({
             <p className="text-[11px] text-warning mb-2">Atenção: o comentário revela o gabarito.</p>
           )}
           {hasComment ? (
-            <p className="text-foreground whitespace-pre-line leading-relaxed">{question.comentario}</p>
+            <p className="text-foreground whitespace-pre-line leading-relaxed">{reflowText(question.comentario ?? "")}</p>
           ) : (
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-muted-foreground">Explicação ainda não adicionada para esta questão.</p>
@@ -553,12 +582,19 @@ export function QuestionBattery({
   const setShowTimer = usePracticePrefsStore((s) => s.setShowTimer);
   const savedPositionId = usePracticePrefsStore((s) => (listKey ? s.positions[listKey] : undefined));
   const savePosition = usePracticePrefsStore((s) => s.savePosition);
+  const markTool = usePracticePrefsStore((s) => s.markTool);
+  const setMarkTool = usePracticePrefsStore((s) => s.setMarkTool);
+  const scissorsMode = usePracticePrefsStore((s) => s.scissorsMode);
+  const setScissorsMode = usePracticePrefsStore((s) => s.setScissorsMode);
+  const dockOpen = useCadernoDockStore((s) => s.open);
+  const toggleDock = useCadernoDockStore((s) => s.toggleDock);
+  const setDockContext = useCadernoDockStore((s) => s.setContext);
 
   const [answers, setAnswers] = useState<Record<string, AnswerState>>({});
   const [struck, setStruck] = useState<Record<string, string[]>>({});
   const [focusMode, setFocusMode] = useState(false);
   const [current, setCurrent] = useState(0);
-  const [panel, setPanel] = useState<"stats" | "font" | "config" | "keys" | null>(null);
+  const [panel, setPanel] = useState<"stats" | "font" | "config" | "keys" | "mark" | null>(null);
   const [exportStart, setExportStart] = useState(1);
   const [withGabarito, setWithGabarito] = useState(true);
   const [preview, setPreview] = useState<{ file: LibraryFile; playlist: LibraryFile[] } | null>(null);
@@ -582,6 +618,13 @@ export function QuestionBattery({
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, [showTimer]);
+
+  useEffect(() => {
+    const q = questions[current];
+    if (q) setDockContext({ tipo: "questao", id: q.id, label: `Questão ${current + 1} — ${q.tema ?? q.subjectName}` });
+  }, [current, questions, setDockContext]);
+
+  useEffect(() => () => setDockContext(null), [setDockContext]);
 
   useEffect(() => {
     questionStartRef.current = Date.now();
@@ -748,7 +791,7 @@ export function QuestionBattery({
     );
 
   return (
-    <div className="flex flex-col gap-4 pb-28 lg:pr-16">
+    <div className={cn("flex flex-col gap-4 pb-28 lg:pr-16 transition-[padding]", dockOpen && "lg:pr-[400px]")}>
       <div className="max-w-3xl mx-auto w-full flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-2.5">
         <div className="flex items-center gap-3 text-xs text-muted-foreground font-metric">
           <span>
@@ -837,7 +880,12 @@ export function QuestionBattery({
       )}
 
       {/* Barra de ferramentas flutuante: vertical à direita no desktop, horizontal no celular. */}
-      <div className="fixed z-30 right-3 bottom-20 lg:bottom-auto lg:top-1/2 lg:-translate-y-1/2 flex lg:flex-col items-center gap-1 rounded-2xl border border-border bg-surface/95 backdrop-blur p-1.5 shadow-lift">
+      <div
+        className={cn(
+          "fixed z-30 right-3 bottom-20 lg:bottom-auto lg:top-1/2 lg:-translate-y-1/2 flex lg:flex-col items-center gap-1 rounded-2xl border border-border bg-surface/95 backdrop-blur p-1.5 shadow-lift transition-[right]",
+          dockOpen && "bottom-[calc(55vh+0.75rem)] lg:right-[392px]"
+        )}
+      >
         {showTimer && (
           <div className="hidden lg:flex flex-col items-center px-1 pb-1 mb-0.5 border-b border-border/60" title="Tempo da sessão / desta questão">
             <span className="font-metric text-[11px] text-foreground">{fmtClock(sessionSeconds)}</span>
@@ -847,6 +895,32 @@ export function QuestionBattery({
         <button type="button" onClick={() => setFocusMode((v) => !v)} className={toolbarBtn(focusMode)} title={focusMode ? "Sair do foco" : "Modo foco (uma por vez)"}>
           <Focus size={17} />
         </button>
+        <button
+          type="button"
+          onClick={() => setPanel((p) => (p === "mark" ? null : "mark"))}
+          className={cn(toolbarBtn(Boolean(markTool) || panel === "mark"), "relative")}
+          title="Marca-texto"
+        >
+          <Highlighter size={17} />
+          {markTool && (
+            <span
+              className="absolute bottom-1 right-1 h-2 w-2 rounded-full border border-white/60"
+              style={{ backgroundColor: markTool.style === "marca" ? HIGHLIGHT_HEX[markTool.color] : UNDERLINE_HEX[markTool.color] }}
+            />
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={() => setScissorsMode(!scissorsMode)}
+          className={toolbarBtn(scissorsMode)}
+          title={scissorsMode ? "Sair do modo tesoura" : "Modo tesoura: clique nas alternativas para cortá-las"}
+        >
+          <Scissors size={17} />
+        </button>
+        <button type="button" onClick={toggleDock} className={toolbarBtn(dockOpen)} title={dockOpen ? "Fechar Caderno" : "Abrir Caderno ao lado"}>
+          <NotebookPen size={17} />
+        </button>
+        <span className="hidden lg:block h-px w-6 bg-border my-0.5" />
         <button type="button" onClick={() => setPanel((p) => (p === "stats" ? null : "stats"))} className={toolbarBtn(panel === "stats")} title="Desempenho da sessão">
           <BarChart3 size={17} />
         </button>
@@ -865,13 +939,19 @@ export function QuestionBattery({
       </div>
 
       {panel && (
-        <div className="fixed z-30 right-3 bottom-36 lg:bottom-auto lg:top-1/2 lg:-translate-y-1/2 lg:right-20 w-72 rounded-2xl border border-border bg-surface shadow-lift p-4 animate-fade-in">
+        <div
+          className={cn(
+            "fixed z-30 right-3 bottom-36 lg:bottom-auto lg:top-1/2 lg:-translate-y-1/2 lg:right-20 w-72 rounded-2xl border border-border bg-surface shadow-lift p-4 animate-fade-in",
+            dockOpen && "lg:right-[460px]"
+          )}
+        >
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm font-semibold text-foreground">
               {panel === "stats" && "Desempenho nesta sessão"}
               {panel === "font" && "Tamanho do texto"}
               {panel === "config" && "Preferências"}
               {panel === "keys" && "Atalhos de teclado"}
+              {panel === "mark" && "Marca-texto"}
             </p>
             <button type="button" onClick={() => setPanel(null)} aria-label="Fechar" className="text-muted-foreground hover:text-foreground">
               <X size={15} />
@@ -964,6 +1044,45 @@ export function QuestionBattery({
             </div>
           )}
 
+          {panel === "mark" && (
+            <div className="flex flex-col gap-3">
+              <p className="text-xs text-muted-foreground">
+                Com uma ferramenta ativa, é só selecionar o texto com o mouse. Sem ferramenta, a seleção abre as opções.
+              </p>
+              {(["marca", "sublinhado"] as const).map((style) => (
+                <div key={style} className="flex items-center gap-2">
+                  <span className="w-16 text-[11px] font-medium text-muted-foreground">{style === "marca" ? "Marcar" : "Sublinhar"}</span>
+                  {COLOR_ORDER.map((color) => {
+                    const active = markTool?.style === style && markTool.color === color;
+                    return (
+                      <button
+                        key={color}
+                        type="button"
+                        onClick={() => setMarkTool(active ? null : { style, color })}
+                        aria-pressed={active}
+                        title={`${style === "marca" ? "Marcar" : "Sublinhar"} (${color})`}
+                        className={cn(
+                          "h-8 w-8 rounded-lg flex items-center justify-center transition-all",
+                          active ? "ring-2 ring-primary ring-offset-2 ring-offset-surface" : "hover:scale-105"
+                        )}
+                        style={style === "marca" ? { backgroundColor: HIGHLIGHT_HEX[color] } : undefined}
+                      >
+                        {style === "sublinhado" && (
+                          <span className="text-sm font-bold text-foreground" style={{ borderBottom: `3px solid ${UNDERLINE_HEX[color]}`, lineHeight: 1 }}>
+                            U
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
+              <button type="button" onClick={() => setMarkTool(null)} disabled={!markTool} className="btn-outline btn-sm self-start">
+                Desligar marca-texto
+              </button>
+            </div>
+          )}
+
           {panel === "keys" && (
             <ul className="flex flex-col gap-2 text-xs text-muted-foreground">
               {[
@@ -972,6 +1091,7 @@ export function QuestionBattery({
                 ["→ ou Espaço", "próxima questão"],
                 ["←", "questão anterior"],
                 ["?", "mostrar/ocultar atalhos"],
+                ["Botão direito", "cortar alternativa"],
               ].map(([k, v]) => (
                 <li key={k} className="flex items-center justify-between gap-3">
                   <kbd className="rounded-md border border-border bg-muted px-1.5 py-0.5 font-metric text-[11px] text-foreground">{k}</kbd>
@@ -982,6 +1102,8 @@ export function QuestionBattery({
           )}
         </div>
       )}
+
+      <CadernoDock variant="fixed" />
 
       <FilePreviewModal
         file={preview?.file ?? null}

@@ -8,6 +8,7 @@ import { FilePreviewModal } from "./FilePreviewModal";
 import { FavoriteButton } from "./FavoriteButton";
 import { KIND_ICON, KIND_SHORT, LibraryFileRow } from "./LibraryFileRow";
 import { LoadingState } from "./LoadingState";
+import { ThematicCover } from "./ThematicCover";
 import { useLibraryStore } from "@/lib/libraryStore";
 import { useClassificationStore } from "@/lib/classificationStore";
 import { classifyLibrary, type ClassifiedFile } from "@/lib/classification";
@@ -15,7 +16,6 @@ import {
   UNCLASSIFIED_LABEL,
   fileKind,
   fileName,
-  fileThumbnailUrl,
   fullPath,
   isFileComplete,
   isFileStarted,
@@ -35,29 +35,9 @@ function folderOf(file: LibraryFile): string {
 }
 
 function VideoThumb({ file }: { file: ClassifiedFile }) {
-  const [failed, setFailed] = useState(false);
-  const color = file.subjectSlug ? resolveSubject(file.subjectSlug).colorToken : "38 92% 50%";
   return (
-    <div
-      className="relative aspect-video w-full overflow-hidden"
-      style={{ background: `linear-gradient(135deg, hsl(${color} / 0.35), hsl(${color} / 0.08) 60%, transparent)` }}
-    >
-      {!failed && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={fileThumbnailUrl(file)}
-          alt=""
-          loading="lazy"
-          referrerPolicy="no-referrer"
-          onError={() => setFailed(true)}
-          className="absolute inset-0 h-full w-full object-cover"
-        />
-      )}
-      {failed && (
-        <span className="absolute inset-0 flex items-center justify-center font-metric text-3xl font-semibold text-foreground/25 px-4 text-center truncate">
-          {fileName(file).replace(/\.[a-z0-9]+$/i, "")}
-        </span>
-      )}
+    <div className="relative">
+      <ThematicCover file={file} className="aspect-video" />
       <span className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/30">
         <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lift">
           <Play size={20} className="fill-current ml-0.5" />

@@ -195,8 +195,12 @@ export interface Highlight {
   start: number;
   end: number;
   color: HighlightColor;
+  /** "marca" = fundo colorido (padrão); "sublinhado" = traço colorido sob o texto. */
+  style?: HighlightStyle;
   createdAt: string;
 }
+
+export type HighlightStyle = "marca" | "sublinhado";
 
 // ---------------------------------------------------------------------------
 // Cronômetro de sessões de estudo (Quizzes/Simulado/Flashcards) — alimenta

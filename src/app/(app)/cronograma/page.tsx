@@ -2,425 +2,214 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
-  Calendar,
-  Check,
+  Brain,
+  CalendarDays,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  Clock,
-  Inbox,
+  Circle,
+  FileText,
   Loader2,
-  Plus,
+  Pencil,
+  PlayCircle,
+  Power,
   RotateCcw,
-  Settings2,
   Sparkles,
-  X,
+  Target,
 } from "lucide-react";
-import { EmptyState } from "@/components/EmptyState";
-import { AllDoneIllustration } from "@/components/Illustrations";
-import { PriorityBadge } from "@/components/PriorityBadge";
-import { useContent } from "@/lib/content";
-import { useStudyStore } from "@/lib/store";
-import { useQuestionStore } from "@/lib/questionStore";
-import { useQuestionProgressStore } from "@/lib/questionProgressStore";
-import { useScheduleStore } from "@/lib/scheduleStore";
-import { getSubjectsFromContentAndQuestions, resolveSubject } from "@/lib/subjects";
-import { getRecommendedTemas } from "@/lib/questionStats";
-import { buildStudyPlan, type PlanItem } from "@/lib/studyPlan";
+import { CronogramaSetup, fmtHoras } from "@/components/cronograma/CronogramaSetup";
+import { FilePreviewModal } from "@/components/FilePreviewModal";
+import { LoadingState } from "@/components/LoadingState";
+import { classifyLibrary, type ClassifiedFile } from "@/lib/classification";
+import { useClassificationStore } from "@/lib/classificationStore";
 import {
-  addDaysIso,
-  formatDayLabel,
-  formatDayNum,
-  formatWeekRangeLabel,
-  formatWeekdayShort,
-  startOfWeekIso,
-  todayIso,
-} from "@/lib/dateUtil";
+  buildCronograma,
+  buildTemaCatalog,
+  questoesHref,
+  useCronogramaStore,
+  type CronoItem,
+  type CronoPlan,
+} from "@/lib/cronograma";
+import { addDaysIso, diffInDays, formatWeekRangeLabel, startOfWeekIso, todayIso } from "@/lib/dateUtil";
+import { isFileComplete } from "@/lib/library";
+import { useLibraryStore } from "@/lib/libraryStore";
+import { useQuestionProgressStore } from "@/lib/questionProgressStore";
+import { useQuestionStore, useQuestionsReady } from "@/lib/questionStore";
+import { useStudyStore } from "@/lib/store";
+import { resolveSubject } from "@/lib/subjects";
+import type { LibraryFile } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-function SetupForm() {
-  const content = useContent();
+const KIND_ICON: Record<CronoItem["kind"], typeof PlayCircle> = {
+  aula: PlayCircle,
+  material: FileText,
+  questoes: Target,
+  revisao: RotateCcw,
+};
+
+export default function CronogramaPage() {
+  const files = useLibraryStore((s) => s.files);
+  const libStatus = useLibraryStore((s) => s.status);
+  const hydrate = useLibraryStore((s) => s.hydrate);
+  const overrides = useClassificationStore((s) => s.overrides);
   const questions = useQuestionStore((s) => s.questions);
-  const config = useScheduleStore((s) => s.config);
-  const setConfig = useScheduleStore((s) => s.setConfig);
-  const subjects = useMemo(() => getSubjectsFromContentAndQuestions(content, questions), [content, questions]);
-
-  const [selected, setSelected] = useState<string[]>(config.selectedSubjects.length > 0 ? config.selectedSubjects : subjects.map((s) => s.slug));
-  const [targetDate, setTargetDate] = useState(config.targetDate);
-  const [dailyMinutes, setDailyMinutes] = useState(config.dailyMinutes);
-
-  function toggleSubject(slug: string) {
-    setSelected((s) => (s.includes(slug) ? s.filter((x) => x !== slug) : [...s, slug]));
-  }
-
-  function handleGenerate() {
-    setConfig({ active: true, selectedSubjects: selected, targetDate, dailyMinutes });
-  }
-
-  return (
-    <div className="max-w-lg mx-auto flex flex-col gap-6">
-      <div className="text-center">
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-light text-primary mx-auto">
-          <Calendar size={26} />
-        </div>
-        <h1 className="text-xl font-semibold text-foreground mt-4">Monte seu cronograma</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Escolha as disciplinas prioritárias e uma data-alvo — distribuímos as aulas, materiais e questões
-          pendentes entre os dias disponíveis.
-        </p>
-      </div>
-
-      <div className="card p-6 flex flex-col gap-5">
-        <div>
-          <p className="text-sm font-medium text-foreground mb-2">Disciplinas a priorizar</p>
-          <div className="flex flex-wrap gap-2">
-            {subjects.map((s) => (
-              <button
-                key={s.slug}
-                type="button"
-                onClick={() => toggleSubject(s.slug)}
-                className={cn(
-                  "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                  selected.includes(s.slug)
-                    ? "border-primary bg-primary-light text-primary"
-                    : "border-border text-muted-foreground hover:bg-surface-hover"
-                )}
-              >
-                {s.name}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <label htmlFor="target-date" className="text-sm font-medium text-foreground block mb-1.5">
-            Data-alvo (prova, fim do rodízio...)
-          </label>
-          <input
-            id="target-date"
-            type="date"
-            min={todayIso()}
-            value={targetDate}
-            onChange={(e) => setTargetDate(e.target.value)}
-            className="input"
-          />
-        </div>
-
-        <div>
-          <label htmlFor="daily-minutes" className="text-sm font-medium text-foreground block mb-1.5">
-            Tempo de estudo disponível por dia (minutos)
-          </label>
-          <input
-            id="daily-minutes"
-            type="number"
-            min={15}
-            step={15}
-            value={dailyMinutes}
-            onChange={(e) => setDailyMinutes(Math.max(15, Number(e.target.value)))}
-            className="input"
-          />
-        </div>
-
-        <button type="button" disabled={selected.length === 0} className="btn-primary" onClick={handleGenerate}>
-          Gerar cronograma
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function ItemRow({ item, justificativa }: { item: PlanItem; justificativa?: string }) {
-  const setWatchStatus = useStudyStore((s) => s.setWatchStatus);
-  const setReadStatus = useStudyStore((s) => s.setReadStatus);
-  const postponeItem = useScheduleStore((s) => s.postponeItem);
-
-  function markDone() {
-    if (!item.content) return;
-    if (item.content.kind === "videoaula") setWatchStatus(item.content.fileId, "assistida");
-    else setReadStatus(item.content.fileId, "estudado");
-  }
-
-  const href =
-    item.kind === "conteudo"
-      ? item.content?.kind === "videoaula"
-        ? `/videoaulas/${item.content.fileId}`
-        : `/materiais/${item.content?.fileId}`
-      : `/questoes/estudo?disciplina=${item.questionSubjectSlug}`;
-
-  return (
-    <div className="flex items-center gap-3 py-3 border-b border-border last:border-0">
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-foreground truncate">{item.title}</p>
-        <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
-          <span>{item.subjectName}</span>
-          <span aria-hidden>·</span>
-          <span className="inline-flex items-center gap-1 font-metric">
-            <Clock size={11} /> {item.estimatedMinutes} min
-          </span>
-          <PriorityBadge priority={item.priority} />
-        </div>
-        {justificativa && (
-          <p className="mt-1 text-xs text-accent inline-flex items-center gap-1">
-            <Sparkles size={11} className="shrink-0" /> {justificativa}
-          </p>
-        )}
-      </div>
-      <Link href={href} className="btn-outline btn-sm shrink-0">
-        Abrir
-      </Link>
-      {item.kind === "conteudo" && (
-        <button type="button" onClick={markDone} className="btn-ghost btn-sm shrink-0" aria-label="Marcar como feito">
-          <Check size={14} />
-        </button>
-      )}
-      <button
-        type="button"
-        onClick={() => postponeItem(item.key)}
-        className="btn-ghost btn-sm shrink-0"
-        aria-label="Adiar para amanhã"
-        title="Adiar para amanhã"
-      >
-        <RotateCcw size={14} />
-      </button>
-    </div>
-  );
-}
-
-interface AiPlannedDay {
-  date: string;
-  items: { item: PlanItem; justificativa?: string }[];
-}
-
-interface DayEntry {
-  items: { item: PlanItem; justificativa?: string }[];
-  budgetMinutes?: number;
-  totalMinutes?: number;
-}
-
-function DayPanel({
-  date,
-  entry,
-  onClose,
-}: {
-  date: string;
-  entry: DayEntry | undefined;
-  onClose: () => void;
-}) {
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  const items = entry?.items ?? [];
-
-  return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-foreground/40 backdrop-blur-sm animate-fade-in" onClick={onClose}>
-      <div
-        className="h-full w-full max-w-md bg-surface border-l border-border shadow-lift flex flex-col animate-slide-in-right"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between gap-3 p-5 border-b border-border/60">
-          <div>
-            <p className="text-xs text-muted-foreground">Dia de estudo</p>
-            <h2 className="font-semibold text-foreground">{formatDayLabel(date)}</h2>
-          </div>
-          <div className="flex items-center gap-3">
-            {entry?.budgetMinutes != null && (
-              <span className="text-xs font-metric text-muted-foreground">
-                {entry.totalMinutes} / {entry.budgetMinutes} min
-              </span>
-            )}
-            <button type="button" onClick={onClose} aria-label="Fechar" className="text-muted-foreground hover:text-foreground">
-              <X size={20} />
-            </button>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-5">
-          {items.length === 0 ? (
-            <div className="flex flex-col items-center text-center gap-3 py-16">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
-                <Inbox size={22} />
-              </div>
-              <p className="text-sm text-muted-foreground">Nenhum item agendado para este dia.</p>
-            </div>
-          ) : (
-            items.map(({ item, justificativa }) => <ItemRow key={item.key} item={item} justificativa={justificativa} />)
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function WeekGrid({
-  weekDates,
-  daysByDate,
-}: {
-  weekDates: string[];
-  daysByDate: Map<string, DayEntry>;
-}) {
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const today = todayIso();
-
-  return (
-    <>
-      <div className="grid grid-cols-7 gap-2">
-        {weekDates.map((date) => {
-          const entry = daysByDate.get(date);
-          const items = entry?.items ?? [];
-          const isToday = date === today;
-          const visible = items.slice(0, 3);
-          const extra = items.length - visible.length;
-          return (
-            <button
-              key={date}
-              type="button"
-              onClick={() => setSelectedDate(date)}
-              className={cn(
-                "flex flex-col gap-2 rounded-xl border p-2.5 text-left min-h-[140px] transition-colors hover:border-primary/50",
-                isToday ? "border-primary/60 bg-primary-light/30" : "border-border bg-surface"
-              )}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] uppercase text-muted-foreground font-medium">{formatWeekdayShort(date)}</span>
-                <span className={cn("text-sm font-metric font-semibold", isToday ? "text-primary" : "text-foreground")}>
-                  {formatDayNum(date)}
-                </span>
-              </div>
-
-              {items.length === 0 ? (
-                <div className="flex-1 flex items-center justify-center text-muted-foreground/50">
-                  <Plus size={16} />
-                </div>
-              ) : (
-                <div className="flex flex-col gap-1.5">
-                  {visible.map(({ item }) => {
-                    const subject = resolveSubject(item.subjectSlug);
-                    return (
-                      <div
-                        key={item.key}
-                        className="rounded-lg border-l-2 bg-muted px-2 py-1.5"
-                        style={{ borderColor: `hsl(${subject.colorToken})` }}
-                      >
-                        <p className="text-[11px] font-medium text-foreground line-clamp-2 leading-tight">{item.title}</p>
-                      </div>
-                    );
-                  })}
-                  {extra > 0 && <p className="text-[11px] text-muted-foreground font-metric px-0.5">+{extra} mais</p>}
-                </div>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      {selectedDate && (
-        <DayPanel date={selectedDate} entry={daysByDate.get(selectedDate)} onClose={() => setSelectedDate(null)} />
-      )}
-    </>
-  );
-}
-
-function PlanView() {
-  const content = useContent();
+  const questionsReady = useQuestionsReady();
+  const questionProgress = useQuestionProgressStore((s) => s.progress);
   const userStates = useStudyStore((s) => s.userStates);
+  const config = useCronogramaStore((s) => s.config);
+  const setConfig = useCronogramaStore((s) => s.setConfig);
+  const [editing, setEditing] = useState(false);
+
+  useEffect(() => {
+    hydrate();
+  }, [hydrate]);
+
+  const classified = useMemo(() => classifyLibrary(files, overrides), [files, overrides]);
+  const catalog = useMemo(() => buildTemaCatalog(classified, questions), [classified, questions]);
+
+  if (libStatus !== "ready" && libStatus !== "error") return <LoadingState label="Carregando seu acervo..." />;
+  if (!questionsReady) return <LoadingState label="Carregando o banco de questões..." />;
+
+  if (!config.active || editing) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div>
+          <h1 className="text-2xl font-semibold text-foreground inline-flex items-center gap-2.5">
+            <CalendarDays size={22} className="text-accent" /> {config.active ? "Ajustar cronograma" : "Monte seu cronograma"}
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Do seu jeito: período, horas de cada dia, as grandes áreas e os temas exatos que você quer estudar agora.
+          </p>
+        </div>
+        <CronogramaSetup
+          initial={config}
+          catalog={catalog}
+          files={classified}
+          userStates={userStates}
+          questions={questions}
+          questionProgress={questionProgress}
+          onCancel={config.active ? () => setEditing(false) : undefined}
+          onSave={(c) => {
+            setConfig(c);
+            setEditing(false);
+          }}
+        />
+      </div>
+    );
+  }
+
+  return <PlanView files={classified} onEdit={() => setEditing(true)} />;
+}
+
+function PlanView({ files, onEdit }: { files: ClassifiedFile[]; onEdit: () => void }) {
+  const router = useRouter();
+  const config = useCronogramaStore((s) => s.config);
+  const feitos = useCronogramaStore((s) => s.feitos);
+  const toggleFeito = useCronogramaStore((s) => s.toggleFeito);
+  const deactivate = useCronogramaStore((s) => s.deactivate);
   const questions = useQuestionStore((s) => s.questions);
   const questionProgress = useQuestionProgressStore((s) => s.progress);
-  const config = useScheduleStore((s) => s.config);
-  const postponed = useScheduleStore((s) => s.postponed);
-  const deactivate = useScheduleStore((s) => s.deactivate);
+  const userStates = useStudyStore((s) => s.userStates);
 
-  const plan = useMemo(
-    () =>
-      buildStudyPlan({
-        selectedSubjects: config.selectedSubjects,
-        targetDate: config.targetDate,
-        dailyMinutes: config.dailyMinutes,
-        content,
-        contentProgress: userStates,
-        questions,
-        questionProgress,
-        postponed,
-      }),
-    [content, userStates, questions, questionProgress, config, postponed]
+  const plan = useMemo<CronoPlan>(
+    () => buildCronograma({ config, files, userStates, questions, questionProgress }),
+    [config, files, userStates, questions, questionProgress]
   );
 
-  const isAllDone = plan.totalPendingMinutes === 0;
-
-  const [aiPlan, setAiPlan] = useState<AiPlannedDay[] | null>(null);
+  const today = todayIso();
+  const [weekStart, setWeekStart] = useState(() => startOfWeekIso(today));
+  const [selectedDate, setSelectedDate] = useState(today);
+  const [preview, setPreview] = useState<{ file: LibraryFile; playlist: LibraryFile[] } | null>(null);
+  const [aiDays, setAiDays] = useState<Map<string, { items: CronoItem[]; notes: Record<string, string> }> | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
-  const [weekStart, setWeekStart] = useState(() => startOfWeekIso(todayIso()));
 
-  const weekDates = useMemo(() => Array.from({ length: 7 }, (_, i) => addDaysIso(weekStart, i)), [weekStart]);
+  const daysByDate = useMemo(() => new Map(plan.days.map((d) => [d.date, d])), [plan.days]);
+  const itemsFor = (date: string): CronoItem[] => {
+    const ai = aiDays?.get(date);
+    const items = ai ? ai.items : daysByDate.get(date)?.items ?? [];
+    return items.filter((i) => i.kind !== "revisao" || !feitos[i.key]);
+  };
+  const weekDates = Array.from({ length: 7 }, (_, i) => addDaysIso(weekStart, i));
+  const todayItems = itemsFor(selectedDate);
+  const selectedDay = daysByDate.get(selectedDate);
+  const coverage = plan.totalConteudoMin > 0 ? Math.round(((plan.totalConteudoMin - plan.sobra.minutos) / plan.totalConteudoMin) * 100) : 100;
+  const diasRestantes = Math.max(0, diffInDays(today, config.fim) + 1);
+  const questoesPrevistas = plan.days.reduce((s, d) => s + d.items.reduce((a, i) => a + (i.questionCount ?? 0), 0), 0);
 
-  const daysByDate = useMemo(() => {
-    const map = new Map<string, DayEntry>();
-    if (aiPlan) {
-      for (const d of aiPlan) map.set(d.date, { items: d.items });
-    } else {
-      for (const d of plan.days) {
-        map.set(d.date, { items: d.items.map((item) => ({ item })), budgetMinutes: d.budgetMinutes, totalMinutes: d.totalMinutes });
-      }
+  const timeline = useMemo(() => {
+    return Array.from(plan.terminoPorTema.entries())
+      .sort((a, b) => a[1].localeCompare(b[1]))
+      .slice(0, 40);
+  }, [plan.terminoPorTema]);
+
+  function openItem(item: CronoItem, dayItems: CronoItem[]) {
+    if (item.file) {
+      const playlist = dayItems.filter((i) => i.file).map((i) => i.file!) as LibraryFile[];
+      setPreview({ file: item.file, playlist });
+      return;
     }
-    return map;
-  }, [aiPlan, plan.days]);
+    if (item.kind === "questoes") {
+      router.push(questoesHref(item.tema, item.questionCount ?? 10));
+      return;
+    }
+    // Revisão: abre o resumo/mapa mental do tema, se houver.
+    const resumo =
+      files.find((f) => f.tema === item.tema && (f.tipo === "Resumo" || f.tipo === "Mapa mental")) ??
+      files.find((f) => f.tema === item.tema && f.tipo === "Pílula");
+    if (resumo) setPreview({ file: resumo, playlist: [resumo] });
+    else router.push(questoesHref(item.tema, 10));
+  }
 
-  async function handleRecalcularComIA() {
+  async function otimizarComIA() {
     setAiLoading(true);
     setAiError(null);
     try {
-      const allItems = [...plan.days.flatMap((d) => d.items), ...plan.overflow];
-      const itemByKey = new Map(allItems.map((i) => [i.key, i]));
-      const temas = getRecommendedTemas(questions, questionProgress, 20);
-
+      const horizon = plan.days.filter((d) => d.date >= today).slice(0, 14);
+      const all = horizon.flatMap((d) => d.items);
+      const byKey = new Map(all.map((i) => [i.key, i]));
       const res = await fetch("/api/ai/cronograma", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          itensPendentes: allItems.map((i) => ({
+          itensPendentes: all.map((i) => ({
             key: i.key,
-            title: i.title,
-            subjectName: i.subjectName,
-            estimatedMinutes: i.estimatedMinutes,
-            priority: i.priority,
+            title: `${i.title} [${i.kind}]`,
+            subjectName: resolveSubject(i.areaSlug).name,
+            estimatedMinutes: i.minutes,
+            priority: (config.areas[i.areaSlug]?.prioridade ?? 2) + 2,
           })),
-          desempenhoPorTema: temas.map((t) => ({ tema: t.tema, subjectName: t.subjectName, accuracyPercent: t.accuracyPercent })),
-          dataAlvo: config.targetDate,
-          disponibilidadeDiaria: config.dailyMinutes,
-          itensConcluidos: Math.max(0, content.filter((c) => config.selectedSubjects.includes(c.subjectSlug)).length - allItems.length),
+          desempenhoPorTema: [],
+          dataAlvo: horizon[horizon.length - 1]?.date ?? config.fim,
+          disponibilidadeDiaria: Math.round(horizon.reduce((s, d) => s + d.budget, 0) / Math.max(1, horizon.filter((d) => d.budget > 0).length)),
+          itensConcluidos: 0,
         }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setAiError(data.error ?? "Não foi possível recalcular com IA agora.");
+        setAiError(data.error ?? "Não foi possível otimizar com IA agora.");
         return;
       }
-
-      const dias: { data: string; itens: { key: string; titulo: string; duracaoMin: number; justificativa?: string }[] }[] = data.dias;
-      const mapped: AiPlannedDay[] = dias
-        .map((d) => {
-          const items: { item: PlanItem; justificativa?: string }[] = [];
-          for (const it of d.itens) {
-            const item = itemByKey.get(it.key);
-            if (item) items.push({ item, justificativa: it.justificativa });
+      const map = new Map<string, { items: CronoItem[]; notes: Record<string, string> }>();
+      for (const d of data.dias as { data: string; itens: { key: string; justificativa?: string }[] }[]) {
+        const items: CronoItem[] = [];
+        const notes: Record<string, string> = {};
+        for (const it of d.itens) {
+          const found = byKey.get(it.key);
+          if (found) {
+            items.push(found);
+            if (it.justificativa) notes[it.key] = it.justificativa;
           }
-          return { date: d.data, items };
-        })
-        .filter((d) => d.items.length > 0);
-
-      if (mapped.length === 0) {
-        setAiError("A IA retornou um plano, mas nenhum item pôde ser associado ao cronograma atual. Tente novamente.");
-        return;
+        }
+        if (items.length) map.set(d.data, { items, notes });
       }
-      setAiPlan(mapped);
+      if (map.size === 0) setAiError("A IA não devolveu um plano utilizável. Tente novamente.");
+      else setAiDays(map);
     } catch {
-      setAiError("Não foi possível conectar à IA agora. O cronograma padrão continua disponível.");
+      setAiError("Não foi possível conectar à IA agora.");
     } finally {
       setAiLoading(false);
     }
@@ -428,92 +217,231 @@ function PlanView() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Cronograma</h1>
+          <h1 className="text-2xl font-semibold text-foreground inline-flex items-center gap-2.5">
+            <CalendarDays size={22} className="text-accent" /> Meu cronograma
+          </h1>
           <p className="text-muted-foreground mt-1">
-            Meta: {new Date(`${config.targetDate}T00:00:00`).toLocaleDateString("pt-BR")} · {config.dailyMinutes}{" "}
-            min/dia · {config.selectedSubjects.length} disciplinas
+            {new Date(`${config.inicio}T12:00:00`).toLocaleDateString("pt-BR")} → {new Date(`${config.fim}T12:00:00`).toLocaleDateString("pt-BR")} ·{" "}
+            {plan.temasTotal} temas · recalcula sozinho conforme você conclui as aulas
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {aiPlan ? (
-            <button type="button" className="btn-outline" onClick={() => setAiPlan(null)}>
-              Voltar ao cronograma padrão
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className="btn-outline btn-sm" onClick={onEdit}>
+            <Pencil size={13} /> Ajustar
+          </button>
+          {aiDays ? (
+            <button type="button" className="btn-outline btn-sm" onClick={() => setAiDays(null)}>
+              <RotateCcw size={13} /> Voltar ao plano automático
             </button>
           ) : (
-            <button type="button" className="btn-outline" onClick={handleRecalcularComIA} disabled={aiLoading || isAllDone}>
-              {aiLoading ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
-              {aiLoading ? "Recalculando..." : "Recalcular com IA"}
+            <button type="button" className="btn-outline btn-sm" onClick={otimizarComIA} disabled={aiLoading}>
+              {aiLoading ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} className="text-accent" />} Otimizar 14 dias com IA
             </button>
           )}
-          <button type="button" className="btn-outline" onClick={deactivate}>
-            <Settings2 size={15} /> Reconfigurar
+          <button type="button" className="btn-ghost btn-sm text-muted-foreground" onClick={deactivate} title="Desativar cronograma">
+            <Power size={13} />
           </button>
         </div>
       </div>
 
       {aiError && <p className="text-sm text-danger">{aiError}</p>}
 
-      {isAllDone ? (
-        <EmptyState
-          illustration={<AllDoneIllustration />}
-          title="Tudo em dia!"
-          description="Você concluiu todo o conteúdo e questões pendentes das disciplinas selecionadas para este cronograma."
-        />
-      ) : (
-        <>
-          {aiPlan && (
-            <p className="text-xs text-muted-foreground inline-flex items-center gap-1">
-              <Sparkles size={12} /> Plano reorganizado pela IA — ajustes manuais (marcar feito, adiar) não exigem nova chamada.
-            </p>
-          )}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <Stat label="Faltam" value={`${diasRestantes} dias`} hint={`${fmtHoras(plan.disponivelMin)} de estudo planejado`} />
+        <Stat label="Temas concluídos" value={`${plan.temasConcluidos}/${plan.temasTotal}`} hint="conteúdo de todos os cursos escolhidos" />
+        <Stat label="Conteúdo que cabe" value={`${Math.min(100, coverage)}%`} hint={`${fmtHoras(plan.totalConteudoMin)} de aulas e leituras`} tone={coverage >= 100 ? "success" : coverage >= 70 ? "warning" : "danger"} />
+        <Stat label="Questões previstas" value={questoesPrevistas.toLocaleString("pt-BR")} hint="dos temas que você acabou de estudar" />
+      </div>
 
-          {!aiPlan && plan.overflow.length > 0 && (
-            <div className="rounded-xl border border-warning/30 bg-warning/5 p-4 flex items-start gap-3">
-              <AlertTriangle size={16} className="text-warning shrink-0 mt-0.5" />
-              <p className="text-sm text-foreground">
-                <strong>{plan.overflow.length} itens</strong> não couberam até a data-alvo com o tempo diário atual.
-                Aumente os minutos por dia ou estenda a data-alvo em Reconfigurar.
-              </p>
-            </div>
-          )}
+      {plan.sobra.itens > 0 && (
+        <div className="rounded-2xl border border-warning/40 bg-warning/10 px-4 py-3 text-sm flex flex-wrap items-center justify-between gap-3">
+          <span className="inline-flex items-start gap-2 text-foreground">
+            <AlertTriangle size={16} className="text-warning shrink-0 mt-0.5" />
+            {plan.sobra.itens} itens ({fmtHoras(plan.sobra.minutos)}) não cabem até o fim do período. Aumente cerca de{" "}
+            {fmtHoras(Math.ceil(plan.sobra.minutos / Math.max(1, plan.days.filter((d) => d.budget > 0).length)))} por dia de estudo, estenda a data
+            ou reduza temas/tipos de material.
+          </span>
+          <button type="button" className="btn-outline btn-sm" onClick={onEdit}>
+            Ajustar
+          </button>
+        </div>
+      )}
 
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => setWeekStart((w) => addDaysIso(w, -7))}
-                aria-label="Semana anterior"
-                className="btn-ghost btn-sm"
-              >
-                <ChevronLeft size={16} />
-              </button>
-              <button type="button" onClick={() => setWeekStart(startOfWeekIso(todayIso()))} className="btn-outline btn-sm">
-                Hoje
-              </button>
-              <button
-                type="button"
-                onClick={() => setWeekStart((w) => addDaysIso(w, 7))}
-                aria-label="Próxima semana"
-                className="btn-ghost btn-sm"
-              >
-                <ChevronRight size={16} />
-              </button>
-            </div>
-            <p className="text-sm font-medium text-foreground font-metric">
-              {formatWeekRangeLabel(weekDates[0], weekDates[6])}
-            </p>
+      <div className="grid xl:grid-cols-[1fr_360px] gap-6 items-start">
+        <div className="flex flex-col gap-4 min-w-0">
+          {/* Semana */}
+          <div className="flex items-center justify-between">
+            <button type="button" className="btn-ghost btn-sm" onClick={() => setWeekStart(addDaysIso(weekStart, -7))} aria-label="Semana anterior">
+              <ChevronLeft size={16} />
+            </button>
+            <p className="text-sm font-semibold text-foreground">{formatWeekRangeLabel(weekDates[0], weekDates[6])}</p>
+            <button type="button" className="btn-ghost btn-sm" onClick={() => setWeekStart(addDaysIso(weekStart, 7))} aria-label="Próxima semana">
+              <ChevronRight size={16} />
+            </button>
+          </div>
+          <div className="grid grid-cols-7 gap-2">
+            {weekDates.map((date) => {
+              const day = daysByDate.get(date);
+              const items = itemsFor(date);
+              const isToday = date === today;
+              const isSel = date === selectedDate;
+              const past = date < today;
+              const off = !day || day.budget === 0;
+              return (
+                <button
+                  key={date}
+                  type="button"
+                  onClick={() => setSelectedDate(date)}
+                  className={cn(
+                    "flex flex-col gap-1.5 rounded-2xl border p-2 text-left min-h-[180px] transition-colors",
+                    isSel ? "border-primary bg-primary-light/60" : "border-border bg-surface hover:border-primary/40",
+                    past && !isSel && "opacity-50"
+                  )}
+                >
+                  <div className="flex items-baseline justify-between">
+                    <span className={cn("text-[11px] uppercase font-semibold", isToday ? "text-primary" : "text-muted-foreground")}>
+                      {new Date(`${date}T12:00:00`).toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", "")}
+                    </span>
+                    <span className={cn("text-sm font-metric", isToday ? "h-6 w-6 rounded-full bg-primary text-primary-foreground inline-flex items-center justify-center" : "text-foreground")}>
+                      {new Date(`${date}T12:00:00`).getDate()}
+                    </span>
+                  </div>
+                  {off ? (
+                    <span className="mt-2 text-[11px] text-muted-foreground">{past ? "" : "Folga"}</span>
+                  ) : (
+                    <>
+                      <span className="text-[10px] font-metric text-muted-foreground">{fmtHoras(day!.used)}</span>
+                      {items.slice(0, 5).map((it) => (
+                        <span
+                          key={it.key}
+                          className="truncate rounded-md px-1.5 py-0.5 text-[10px] leading-tight"
+                          style={{ background: `hsl(${resolveSubject(it.areaSlug).colorToken} / 0.16)`, color: `hsl(${resolveSubject(it.areaSlug).colorToken})` }}
+                          title={it.title}
+                        >
+                          {it.kind === "questoes" ? "◎ " : it.kind === "revisao" ? "↺ " : ""}
+                          {it.tema}
+                        </span>
+                      ))}
+                      {items.length > 5 && <span className="text-[10px] text-muted-foreground">+{items.length - 5}</span>}
+                    </>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
-          <WeekGrid weekDates={weekDates} daysByDate={daysByDate} />
-        </>
-      )}
+          {/* Dia selecionado */}
+          <section className="card p-5 flex flex-col gap-3">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="font-semibold text-foreground">
+                {selectedDate === today ? "Hoje" : new Date(`${selectedDate}T12:00:00`).toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}
+              </h2>
+              {selectedDay && selectedDay.budget > 0 && (
+                <span className="text-xs font-metric text-muted-foreground">
+                  {fmtHoras(selectedDay.used)} de {fmtHoras(selectedDay.budget)}
+                </span>
+              )}
+            </div>
+            {todayItems.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-6 text-center">
+                {selectedDay && selectedDay.budget > 0 ? "Tudo concluído por aqui. 🎉" : "Dia de folga — descanse também faz parte."}
+              </p>
+            ) : (
+              todayItems.map((item) => {
+                const Icon = KIND_ICON[item.kind];
+                const color = resolveSubject(item.areaSlug).colorToken;
+                const done = item.file ? isFileComplete(item.file, userStates[item.file.id]) : Boolean(feitos[item.key]);
+                const note = aiDays?.get(selectedDate)?.notes[item.key];
+                return (
+                  <div key={item.key} className="flex items-center gap-3 rounded-xl border border-border px-3 py-2.5 hover:bg-surface-hover">
+                    {item.kind === "revisao" ? (
+                      <button type="button" onClick={() => toggleFeito(item.key)} aria-label="Marcar revisão como feita" className="text-muted-foreground hover:text-success">
+                        {done ? <CheckCircle2 size={18} className="text-success" /> : <Circle size={18} />}
+                      </button>
+                    ) : (
+                      <span className="h-8 w-8 shrink-0 rounded-lg inline-flex items-center justify-center" style={{ background: `hsl(${color} / 0.14)`, color: `hsl(${color})` }}>
+                        {done ? <CheckCircle2 size={16} /> : <Icon size={16} />}
+                      </span>
+                    )}
+                    <button type="button" onClick={() => openItem(item, todayItems)} className="flex-1 min-w-0 text-left">
+                      <span className={cn("block text-sm truncate", done ? "text-muted-foreground line-through" : "text-foreground font-medium")}>{item.title}</span>
+                      <span className="block text-[11px] truncate" style={{ color: `hsl(${color})` }}>
+                        {resolveSubject(item.areaSlug).name} · {item.tema}
+                        {item.file ? ` · ${item.file.curso}` : ""}
+                      </span>
+                      {note && <span className="block text-[11px] text-accent mt-0.5">✦ {note}</span>}
+                    </button>
+                    <span className="text-xs font-metric text-muted-foreground shrink-0">{fmtHoras(item.minutes)}</span>
+                  </div>
+                );
+              })
+            )}
+          </section>
+        </div>
+
+        {/* Linha do tempo dos temas */}
+        <aside className="card p-5 flex flex-col gap-3">
+          <h2 className="font-semibold text-foreground inline-flex items-center gap-2">
+            <Brain size={16} className="text-accent" /> Linha do tempo dos temas
+          </h2>
+          <p className="text-xs text-muted-foreground">Quando o conteúdo de cada tema termina — as questões e revisões vêm logo depois.</p>
+          <ol className="relative flex flex-col gap-2.5 pl-4 before:absolute before:left-[5px] before:top-1 before:bottom-1 before:w-px before:bg-border">
+            {timeline.map(([tema, date]) => {
+              const unitArea = Object.entries(config.areas).find(([, a]) => a.temas.includes(tema))?.[0];
+              const color = unitArea ? resolveSubject(unitArea).colorToken : "var(--primary)";
+              return (
+                <li key={tema} className="relative">
+                  <span className="absolute -left-4 top-1.5 h-2.5 w-2.5 rounded-full ring-2 ring-surface" style={{ background: `hsl(${color})` }} />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setWeekStart(startOfWeekIso(date));
+                      setSelectedDate(date);
+                    }}
+                    className="text-left"
+                  >
+                    <span className="block text-sm text-foreground leading-snug">{tema}</span>
+                    <span className="block text-[11px] font-metric text-muted-foreground">
+                      {new Date(`${date}T12:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+            {timeline.length === 0 && <li className="text-sm text-muted-foreground">Nenhum tema com conteúdo pendente.</li>}
+          </ol>
+          <Link href="/questoes" className="btn-outline btn-sm self-start mt-2">
+            <Target size={13} /> Banco de questões
+          </Link>
+        </aside>
+      </div>
+
+      <FilePreviewModal
+        file={preview?.file ?? null}
+        playlist={preview?.playlist}
+        onClose={() => setPreview(null)}
+        onNavigate={(f) => setPreview((p) => (p ? { ...p, file: f } : p))}
+      />
     </div>
   );
 }
 
-export default function CronogramaPage() {
-  const active = useScheduleStore((s) => s.config.active);
-  return active ? <PlanView /> : <SetupForm />;
+function Stat({ label, value, hint, tone }: { label: string; value: string; hint?: string; tone?: "success" | "warning" | "danger" }) {
+  return (
+    <div className="card p-4">
+      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p
+        className={cn(
+          "text-2xl font-semibold font-metric mt-1",
+          tone === "success" ? "text-success" : tone === "warning" ? "text-warning" : tone === "danger" ? "text-danger" : "text-foreground"
+        )}
+      >
+        {value}
+      </p>
+      {hint && <p className="text-[11px] text-muted-foreground mt-0.5">{hint}</p>}
+    </div>
+  );
 }
+

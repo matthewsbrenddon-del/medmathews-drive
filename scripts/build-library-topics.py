@@ -37,6 +37,9 @@ CODES = {
     "REU": "Reumatologia", "DER": "Dermatologia", "OFT": "Oftalmologia", "ORL": "Otorrinolaringologia",
     "OTO": "Otorrinolaringologia", "ORT": "Ortopedia", "URO": "Urologia", "CM": "Clínica Médica",
     "CX": "Cirurgia", "GO": "Ginecologia e Obstetrícia", "INT": "Medicina Intensiva", "EME": "Emergência",
+    "NEFRO": "Nefrologia", "CARDIO": "Cardiologia", "PNEUMO": "Pneumologia", "GASTRO": "Gastroenterologia",
+    "ENDOCRINO": "Endocrinologia", "REUMATO": "Reumatologia", "HEMATO": "Hematologia", "INFECTO": "Infectologia",
+    "NEURO": "Neurologia", "GINECO": "Ginecologia", "HEPATO": "Hepatologia", "PSIQ": "Psiquiatria",
 }
 
 # Pastas que só organizam (não dizem o assunto).
@@ -91,7 +94,7 @@ def split_ext(name):
 
 def expand_code(seg):
     """'CAR 2' -> 'Cardiologia 2'; 'Ped 1 - Neonatologia' -> 'Neonatologia'."""
-    m = re.match(r"^([A-Za-z]{2,4})\s*(\d+)?\s*(?:-\s*(.+))?$", seg.strip())
+    m = re.match(r"^([A-Za-z]{2,9})\s*(\d+)?\s*(?:-\s*(.+))?$", seg.strip())
     if m and m.group(1).upper() in CODES:
         if m.group(3):
             return m.group(3).strip(), CODES[m.group(1).upper()]
@@ -527,6 +530,17 @@ def main():
         for k in ("titulo", "tipo", "tema", "subtema"):
             it.pop(k, None)
         it.update(process(it))
+    # Mesmo tema com grafias diferentes ("Psiquiatria infantil"/"Psiquiatria Infantil"): usa a mais frequente.
+    for field in ("tema", "subtema"):
+        variants = defaultdict(Counter)
+        for it in items:
+            if it.get(field):
+                variants[norm(it[field])][it[field]] += 1
+        best = {k: c.most_common(1)[0][0] for k, c in variants.items()}
+        for it in items:
+            if it.get(field):
+                it[field] = best[norm(it[field])]
+
     FILE.write_text(json.dumps(items, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
 
     temas = Counter(it["tema"] for it in items)

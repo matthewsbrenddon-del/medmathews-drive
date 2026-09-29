@@ -32,9 +32,9 @@ O banco de questões de residência segue a mesma lógica: planilha `.xlsx` com 
 
 Veja `src/lib/importCourses.ts` e `src/lib/importQuestions.ts` para as regras de validação (erros são reportados linha a linha, sem travar a importação inteira).
 
-## Cronograma adaptativo
+## Cronograma personalizável
 
-Em **Cronograma**, escolha as disciplinas a priorizar, uma data-alvo e quantos minutos por dia você tem disponíveis. O app distribui as aulas/materiais pendentes (respeitando a `Prioridade` da planilha e a duração de cada item) e blocos de questões pendentes/erradas entre os dias até a data-alvo. O plano é sempre recalculado a partir do progresso atual — nada fica "desatualizado": assim que você conclui algo, ele some do plano automaticamente. Dá para adiar qualquer item para o dia seguinte.
+Em **Cronograma**, monte o plano em 4 passos: **período** (início e fim — prova, rodízio, bloco de revisão), **disponibilidade** (minutos de cada dia da semana + folgas em datas específicas), **conteúdo** (grandes áreas com prioridade baixa/média/alta e os temas exatos de cada uma, ordenados pelos mais cobrados no banco de questões) e **estratégia** (cursos, "um curso por tema", tipos de material, mistura aulas/questões/revisão, áreas intercaladas ou uma por vez, revisão espaçada D+1/D+7/D+30). Um resumo ao vivo mostra quanto do conteúdo cabe no período. O plano (`src/lib/cronograma.ts`) usa as aulas reais do acervo (temas de `library-mapeamento.json`) e as questões do banco, e é sempre recalculado a partir do progresso atual — ao concluir uma aula, os próximos dias se reorganizam sozinhos.
 
 ## Disciplinas — uma biblioteca, duas navegações
 
@@ -54,7 +54,7 @@ Ambas abrem o mesmo `FilePreviewModal` (preview do Drive embutido num iframe, se
 - Ou em lote via planilha: **Configurações → Importar planilha de taxonomia** — `.xlsx` com colunas `ID do Arquivo (Drive)` (ou `Curso` + `Conteúdo`), `Grande Área`, `Disciplina`, `Subtema` (ver `seed-data/MedStudyHub_Taxonomia_Curso_Drive.xlsx`, quando disponível).
 - Classificações manuais/importadas ficam em `classificationStore` (localStorage, só os overrides — a sugestão automática nunca é persistida, é recalculada na hora).
 
-O acervo não entra no `contentStore`/`studyPlan`: o cronograma adaptativo continua operando só sobre a grade curada de exemplo — não faria sentido agendar 13,6 mil itens automaticamente. `src/lib/libraryStore.ts` busca o JSON uma única vez por sessão, sem persistir em `localStorage` (grande demais e é referência estática).
+O cronograma agenda só os temas que o aluno escolhe (nunca o acervo inteiro). `src/lib/libraryStore.ts` busca o JSON uma única vez por sessão, sem persistir em `localStorage` (grande demais e é referência estática).
 
 ## IA para quizzes, flashcards e cronograma (opcional)
 
@@ -62,7 +62,7 @@ Três recursos adicionais — nunca substitutivos — usam a API da Claude quand
 
 - **Quizzes** (`/quizzes`, `/api/ai/quiz`, modelo Claude Sonnet): gera questões de múltipla escolha em tempo real a partir de um tema/instrução e, opcionalmente, um material de referência colado (texto). Cada questão gerada passa por uma tela de revisão (editar enunciado/alternativas/gabarito/comentário, aprovar ou descartar) antes de entrar no Banco de Questões, marcada com `origem: "ia"`.
 - **Gerar flashcards com IA** (`/api/ai/flashcards`, modelo Claude Haiku, em **Flashcards**): dois modos — a partir de questões do banco selecionadas como material de origem, ou a partir de um tema livre + material de referência colado. Os cartões passam por uma tela de revisão (editar/descartar/aprovar em lote) antes de serem salvos no deck.
-- **Recalcular com IA** (`/api/ai/cronograma`, modelo Claude Sonnet, em **Cronograma**): reorganiza os mesmos itens pendentes do algoritmo determinístico (`src/lib/studyPlan.ts`), levando em conta o desempenho por tema no banco de questões, e acrescenta uma justificativa curta para os itens de alta prioridade. Só roda quando o usuário clica no botão — nunca automaticamente, para controlar custo. O algoritmo determinístico continua sendo o padrão/fallback.
+- **Otimizar 14 dias com IA** (`/api/ai/cronograma`, em **Cronograma**): reorganiza os itens dos próximos 14 dias do plano determinístico (`src/lib/cronograma.ts`), levando em conta o desempenho por tema no banco de questões, e acrescenta uma justificativa curta para os itens de alta prioridade. Só roda quando o usuário clica no botão — nunca automaticamente, para controlar custo. O algoritmo determinístico continua sendo o padrão/fallback.
 
 A chave nunca é exposta no navegador — toda chamada à API da Claude acontece em `src/app/api/ai/*` (server-side), via `src/lib/ai/anthropicClient.ts`.
 

@@ -4,7 +4,7 @@ import { AI_MODELS, AI_UNAVAILABLE_MESSAGE, getAnthropicClient } from "@/lib/ai/
 /**
  * Cronograma adaptativo com IA (spec v2, seção 6.2) — chamado explicitamente
  * pelo botão "Recalcular com IA", nunca automático. O algoritmo
- * determinístico de src/lib/studyPlan.ts continua sendo o padrão e o
+ * determinístico de src/lib/cronograma.ts continua sendo o padrão e o
  * fallback; esta rota só reordena/redistribui os MESMOS itens pendentes que
  * o cliente já calculou, acrescentando uma justificativa curta para os
  * itens de alta prioridade.

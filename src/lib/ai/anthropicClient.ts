@@ -6,7 +6,7 @@ import Anthropic from "@anthropic-ai/sdk";
 //
 // ANTHROPIC_API_KEY é opcional: sem ela, os recursos de IA (seção 6 do spec)
 // ficam indisponíveis e a interface degrada com uma mensagem clara — o
-// cronograma determinístico (src/lib/studyPlan.ts) e a geração de flashcards
+// cronograma determinístico (src/lib/cronograma.ts) e a geração de flashcards
 // a partir do banco de questões continuam funcionando normalmente, sem IA.
 // ============================================================================
 

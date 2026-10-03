@@ -1,3 +1,4 @@
+import { guardRoute } from "@/lib/server/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { parseTaxonomyWorkbook } from "@/lib/importTaxonomy";
 
@@ -9,6 +10,8 @@ import { parseTaxonomyWorkbook } from "@/lib/importTaxonomy";
  * a confirmação.
  */
 export async function POST(req: NextRequest) {
+  const denied = await guardRoute(req);
+  if (denied) return denied;
   const formData = await req.formData();
   const file = formData.get("file");
 

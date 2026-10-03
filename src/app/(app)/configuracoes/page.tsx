@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { RefreshCcw, Info, Moon, Database, ClipboardList, User } from "lucide-react";
+import { AccountPanel } from "@/components/AccountPanel";
 import { ConfirmationModal } from "@/components/ConfirmationModal";
 import { ImportCoursesPanel } from "@/components/ImportCoursesPanel";
 import { ImportQuestionsPanel } from "@/components/ImportQuestionsPanel";
@@ -43,6 +44,8 @@ export default function ConfiguracoesPage() {
         <h1 className="text-2xl font-semibold text-foreground">Configurações</h1>
         <p className="text-muted-foreground mt-1">Importe sua biblioteca de estudos e ajuste preferências.</p>
       </div>
+
+      <AccountPanel />
 
       <section className="card p-5 flex items-center gap-4">
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent/10 text-accent shrink-0">

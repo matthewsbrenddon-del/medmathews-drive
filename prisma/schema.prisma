@@ -66,12 +66,58 @@ enum QuestionStatus {
 }
 
 model User {
+  id           String   @id @default(cuid())
+  /// Sempre minúsculo e sem espaços (normalizado no cadastro e no login).
+  email        String   @unique
+  name         String?
+  /// scrypt$N$r$p$salt$hash — nunca a senha em texto.
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sessions Session[]
+  states   UserState[]
+  progress UserProgress[]
+}
+
+/// Sessão de login (um por dispositivo/navegador). O cookie guarda um token
+/// aleatório; aqui fica só o SHA-256 dele — vazar o banco não vaza sessões.
+model Session {
+  id         String   @id
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+  expiresAt  DateTime
+  userAgent  String?
+  ip         String?
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+/// Dados do aluno sincronizados entre dispositivos — um registro por "store"
+/// do app (progresso, caderno, quizzes, agenda…). Última escrita vence, por
+/// chave, pelo horário em que a alteração foi feita no dispositivo.
+model UserState {
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key        String
+  data       String
+  modifiedAt DateTime
+  updatedAt  DateTime @updatedAt
+
+  @@id([userId, key])
+}
+
+/// Tentativas de login/cadastro, para limitar força bruta por e-mail e por IP.
+model AuthAttempt {
   id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
+  key       String
+  success   Boolean
   createdAt DateTime @default(now())
 
-  progress UserProgress[]
+  @@index([key, createdAt])
 }
 
 /// Um item de conteúdo (aula ou material) importado da planilha de cursos.

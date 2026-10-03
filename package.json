@@ -8,7 +8,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "postinstall": "prisma generate",
+    "vercel-build": "prisma generate && node scripts/migrate-if-db.mjs && next build",
+    "db:migrate": "prisma migrate deploy"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",

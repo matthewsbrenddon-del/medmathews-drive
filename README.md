@@ -106,6 +106,18 @@ Em **Agenda**: visões **Mês, Semana, Dia, To-do e Kanban** sobre as mesmas fon
 
 O Kanban tem as colunas A fazer / Fazendo / Concluído (arrastar e soltar); para tarefas do Google, "Fazendo" é guardado localmente, já que o Google Tasks só tem pendente/concluída.
 
+## Contas e acesso em vários dispositivos
+
+Com `DATABASE_URL` (Postgres) configurado, a plataforma exige login por **e-mail e senha** (`/entrar`) e sincroniza todos os dados do aluno — progresso, questões, cadernos, listas, grifos, flashcards, quizzes, cronograma, agenda, sessões de estudo e preferências — entre os dispositivos:
+
+- **Segurança**: senha com scrypt (sal por usuário, comparação em tempo constante, mesmo tempo de resposta para e-mail inexistente); sessão por cookie `httpOnly` + `Secure` + `SameSite=Lax` com token aleatório de 256 bits, guardado no banco só como SHA-256; validade de 30 dias renovada com o uso; escritas exigem `Origin` do próprio site; limite de tentativas (5 senhas erradas por e-mail e 20 por IP a cada 15 min); cabeçalhos de segurança (HSTS, `X-Frame-Options`, `nosniff`…). As rotas de IA, importação e iCal também passam a exigir login.
+- **Dispositivos**: em Configurações → Conta e dispositivos dá para ver onde a conta está conectada, desconectar um aparelho, sair de todos e trocar a senha (desconecta os outros). Ao sair, os dados são apagados daquele navegador.
+- **Sincronização** (`src/lib/sync/syncEngine.ts` + `/api/sync`): cada store salvo no navegador vira um bloco por usuário no banco; alterações sobem em ~1,5 s, e as de outros aparelhos chegam a cada 30 s e ao voltar para a aba, sem recarregar. Em conflito, vence a alteração mais recente daquele bloco. Ao criar a conta, o que já foi estudado naquele navegador vai junto.
+
+**Deploy:** crie um Postgres (na Vercel: Storage → Postgres/Neon, que já preenche `DATABASE_URL`), faça o deploy — o script `vercel-build` gera o Prisma Client e aplica as migrações (`prisma/migrations`). Localmente: `DATABASE_URL=... npx prisma migrate deploy`.
+
+**Ainda não incluso:** recuperação de senha por e-mail (exige um serviço de envio de e-mails) e login com Google.
+
 ## Banco de dados / produção
 
 Esta versão de demonstração roda inteiramente no navegador (localStorage), então **nenhuma variável de ambiente é necessária** para publicar em um serviço como o Vercel. Se quiser persistir em um banco real:

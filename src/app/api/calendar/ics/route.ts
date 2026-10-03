@@ -1,3 +1,4 @@
+import { guardRoute } from "@/lib/server/auth";
 import { NextRequest, NextResponse } from "next/server";
 import ICAL from "ical.js";
 
@@ -46,6 +47,8 @@ function toOut(time: ICAL.Time): { value: string; allDay: boolean } {
 }
 
 export async function GET(req: NextRequest) {
+  const denied = await guardRoute(req);
+  if (denied) return denied;
   const raw = req.nextUrl.searchParams.get("url") ?? "";
   const url = isAllowed(raw);
   if (!url) {

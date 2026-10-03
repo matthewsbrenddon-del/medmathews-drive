@@ -1,3 +1,4 @@
+import { guardRoute } from "@/lib/server/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { parseQuestionsWorkbook } from "@/lib/importQuestions";
 
@@ -7,6 +8,8 @@ import { parseQuestionsWorkbook } from "@/lib/importQuestions";
  * grava em banco, apenas devolve o preview para confirmação no client.
  */
 export async function POST(req: NextRequest) {
+  const denied = await guardRoute(req);
+  if (denied) return denied;
   const formData = await req.formData();
   const file = formData.get("file");
 

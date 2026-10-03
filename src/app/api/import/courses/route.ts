@@ -1,3 +1,4 @@
+import { guardRoute } from "@/lib/server/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { parseCoursesWorkbook } from "@/lib/importCourses";
 
@@ -13,6 +14,8 @@ import { parseCoursesWorkbook } from "@/lib/importCourses";
  * apenas devolver o preview.
  */
 export async function POST(req: NextRequest) {
+  const denied = await guardRoute(req);
+  if (denied) return denied;
   const formData = await req.formData();
   const file = formData.get("file");
 

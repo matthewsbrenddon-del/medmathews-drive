@@ -13,6 +13,8 @@ import { useNotebookStore } from "@/lib/notebookStore";
 import { useLibraryStore } from "@/lib/libraryStore";
 import { useClassificationStore } from "@/lib/classificationStore";
 import { classifyLibrary } from "@/lib/classification";
+import { useAuthStore } from "@/lib/auth/authClient";
+import { useSyncStatus } from "@/lib/sync/syncEngine";
 import { Logo } from "./Logo";
 import { ThemeToggle } from "./ThemeToggle";
 
@@ -29,6 +31,8 @@ export function Sidebar() {
 
   const userStates = useStudyStore((s) => s.userStates);
   const studentName = useStudyStore((s) => s.studentName);
+  const authUser = useAuthStore((s) => s.user);
+  const syncStatus = useSyncStatus((s) => s.status);
   const streak = useStudyStore((s) => s.currentStreak());
   const completedCount = useMemo(
     () => Object.values(userStates).filter((s) => s.watchStatus === "assistida" || s.readStatus === "estudado").length,
@@ -57,7 +61,7 @@ export function Sidebar() {
     "/favoritos": contentFavoritesCount + questionFavoritesCount,
   };
 
-  const displayName = studentName.trim() || "Estudante";
+  const displayName = studentName.trim() || authUser?.name || "Estudante";
 
   return (
     <aside className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 border-r border-border bg-surface">
@@ -75,8 +79,17 @@ export function Sidebar() {
         href="/configuracoes"
         className="flex items-center gap-3 px-4 py-3.5 border-b border-border hover:bg-surface-hover transition-colors"
       >
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent/15 text-accent font-semibold text-sm">
+        <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent/15 text-accent font-semibold text-sm">
           {initials(displayName)}
+          {authUser && (
+            <span
+              title={syncStatus === "ok" ? "Sincronizado com a sua conta" : syncStatus === "syncing" ? "Sincronizando…" : "Sincronização pendente"}
+              className={cn(
+                "absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full ring-2 ring-surface",
+                syncStatus === "ok" ? "bg-success" : syncStatus === "syncing" ? "bg-primary animate-pulse" : "bg-warning"
+              )}
+            />
+          )}
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-foreground truncate">{displayName}</p>

@@ -1,3 +1,4 @@
+import { guardRoute } from "@/lib/server/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { AI_MODELS, AI_UNAVAILABLE_MESSAGE, getAnthropicClient } from "@/lib/ai/anthropicClient";
 
@@ -91,6 +92,8 @@ function parseCards(text: string): GeneratedCard[] {
 }
 
 export async function POST(req: NextRequest) {
+  const denied = await guardRoute(req);
+  if (denied) return denied;
   const client = getAnthropicClient();
   if (!client) {
     return NextResponse.json({ error: AI_UNAVAILABLE_MESSAGE }, { status: 501 });

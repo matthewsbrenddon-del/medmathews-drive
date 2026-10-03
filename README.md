@@ -92,6 +92,20 @@ A área de prática (Questões, Quizzes, Flashcards, Simulado e Minhas Listas, a
 - **Exportação em PDF** (`src/lib/pdfExport.ts`, via `jspdf`): exporta a bateria filtrada atual em um PDF formatado, com marca d'água da plataforma em todas as páginas, nome do aluno (definido em **Configurações → Seu nome**) e data na capa, e gabarito comentado ao final. Limitada a 100 questões por exportação — para exportar o restante, informe "a partir da questão" no topo da bateria (ou navegue até lá em modo Foco) e exporte novamente a partir dali.
 - **Cronômetro de sessão** (`src/lib/useStudyTimer.ts` + `src/lib/studySessionStore.ts`): mede automaticamente o tempo líquido gasto em cada sessão de Questões/Simulado/Flashcards (sessões residuais de menos de 3s não contam) e alimenta o painel **Horas líquidas de estudo** em **Meu Progresso**, filtrável por 24h/7 dias/mensal/anual/período selecionável, com detalhamento por tipo de sessão.
 
+## Modo foco (Pomodoro, cronômetro e timer)
+
+Um botão flutuante em todas as telas abre o timer de estudo: **Pomodoro** (foco/pausa/pausa longa configuráveis, auto-iniciar, som e notificação), **cronômetro** e **timer** com contagem regressiva. Pode ser usado avulso ou vinculado ao que está aberto — o player de aula e a tela de questões têm um controle compacto que inicia o timer já com o nome da aula/sessão. O estado é salvo com horários reais (`src/lib/focusTimerStore.ts`), então continua certo ao trocar de tela ou recarregar. Cada trecho de foco vira uma sessão em Meu Progresso (horas líquidas somam a **união** dos intervalos, sem contar em dobro um Pomodoro feito durante uma sessão de questões) e aparece na Agenda. Em `/foco` há a versão em tela cheia com os últimos 7 dias.
+
+## Agenda (Google Agenda, tarefas, Kanban)
+
+Em **Agenda**: visões **Mês, Semana, Dia, To-do e Kanban** sobre as mesmas fontes, com sincronização a cada minuto e sempre que a aba volta ao foco:
+
+- **Conta Google** (leitura e escrita): o aluno conecta a própria conta pelo Google Identity Services no navegador — eventos de todas as agendas marcadas, criação/exclusão de eventos e as tarefas do **Google Tasks** (concluir/reabrir e criar). Precisa de um ID do cliente OAuth (`NEXT_PUBLIC_GOOGLE_CLIENT_ID` ou colado na própria Agenda); o token fica só na aba (`sessionStorage`) e nunca passa pelo servidor.
+- **Link iCal secreto** (somente leitura, sem configurar nada): `/api/calendar/ics` busca e expande o `.ics` (inclusive eventos recorrentes e exceções, via `ical.js`). Só aceita endereços `calendar.google.com/calendar/ical/…`.
+- **Eventos e tarefas locais** (prioridade, etiqueta, prazo com horário), o **Cronograma** de estudos e as **sessões de estudo** como camadas.
+
+O Kanban tem as colunas A fazer / Fazendo / Concluído (arrastar e soltar); para tarefas do Google, "Fazendo" é guardado localmente, já que o Google Tasks só tem pendente/concluída.
+
 ## Banco de dados / produção
 
 Esta versão de demonstração roda inteiramente no navegador (localStorage), então **nenhuma variável de ambiente é necessária** para publicar em um serviço como o Vercel. Se quiser persistir em um banco real:

@@ -228,7 +228,10 @@ export type HighlightStyle = "marca" | "sublinhado";
 
 export interface StudySession {
   id: string;
-  kind: "quiz" | "simulado" | "flashcards" | "estudo";
+  /** "foco" = Pomodoro / cronômetro / timer de estudo (avulso ou vinculado a uma atividade). */
+  kind: "quiz" | "simulado" | "flashcards" | "estudo" | "foco";
+  /** O que estava sendo estudado (ex.: "Aula: Choque — Videoaula 1"). */
+  label?: string;
   startedAt: string; // ISO datetime
   endedAt: string; // ISO datetime
   durationSeconds: number;

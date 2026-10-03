@@ -1,3 +1,4 @@
+import { FocusTimerWidget } from "@/components/FocusTimer";
 import { Header } from "@/components/Header";
 import { MobileNav } from "@/components/MobileNav";
 import { Sidebar } from "@/components/Sidebar";
@@ -13,6 +14,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <main className="px-4 sm:px-6 lg:px-10 py-6 lg:py-10 pb-24 lg:pb-10 max-w-7xl mx-auto">{children}</main>
         </div>
         <MobileNav />
+        <FocusTimerWidget />
       </div>
     </OnboardingGuard>
   );

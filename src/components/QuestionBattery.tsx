@@ -45,6 +45,7 @@ import { useQuestionProgressStore } from "@/lib/questionProgressStore";
 import { useStudyStore } from "@/lib/store";
 import { useStudyTimer } from "@/lib/useStudyTimer";
 import { ApostilaExportModal } from "./ApostilaExportModal";
+import { FocusTimerInline } from "./FocusTimer";
 import { resolveSubject } from "@/lib/subjects";
 import { cn } from "@/lib/utils";
 import { reflowText } from "@/lib/reflowText";
@@ -844,9 +845,12 @@ export function QuestionBattery({
           </span>
           {streak > 0 && <span className="text-warning">🔥 {streak}d</span>}
         </div>
+        <div className="flex items-center gap-2">
+        <FocusTimerInline label={kind === "simulado" ? "Simulado" : "Resolvendo questões"} />
         <button type="button" className="btn-outline btn-sm" onClick={() => setExportOpen(true)} title="Apostila em PDF com estas questões">
           <FileDown size={13} /> Apostila PDF ({questions.length})
         </button>
+        </div>
       </div>
 
       <ApostilaExportModal

@@ -31,6 +31,7 @@ import {
   type LibraryFileKind,
 } from "@/lib/library";
 import { FavoriteButton } from "./FavoriteButton";
+import { FocusTimerInline } from "./FocusTimer";
 import { NoteButton } from "./NoteButton";
 import { CadernoDock } from "./CadernoDock";
 import { ThematicCover } from "./ThematicCover";
@@ -197,6 +198,7 @@ export function FilePreviewModal({
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
+            <FocusTimerInline label={`${isVideo ? "Aula" : "Material"}: ${name}`} className="mr-1" />
             <button
               type="button"
               onClick={toggleDock}
